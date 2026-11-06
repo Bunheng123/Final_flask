@@ -7,6 +7,8 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from app import app as flask_app
 from extensions import db as _db
 from models.user import User
@@ -16,11 +18,21 @@ from werkzeug.security import generate_password_hash
 def app():
     flask_app.config.update({
         'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'WTF_CSRF_ENABLED': False,
     })
 
+    # Isolate test suite from instance/mydb.sqlite3 using an in-memory SQLite engine with StaticPool
+    mem_engine = create_engine(
+        'sqlite:///:memory:',
+        connect_args={'check_same_thread': False},
+        poolclass=StaticPool
+    )
+
     with flask_app.app_context():
+        sa_state = flask_app.extensions['sqlalchemy']
+        orig_engine = sa_state.engines.get(None)
+        sa_state.engines[None] = mem_engine
+
         _db.create_all()
 
         # Seed test admin user and standard user for permission tests
@@ -44,6 +56,7 @@ def app():
 
         _db.session.remove()
         _db.drop_all()
+        sa_state.engines[None] = orig_engine
 
 @pytest.fixture
 def client(app):
