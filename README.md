@@ -191,7 +191,7 @@ Stores user accounts for authentication and administration.
 | `username` | `String(80)` | Not Null | Account username |
 | `email` | `String(120)` | Unique, Not Null | Account email address |
 | `password` | `String(255)` | Not Null | Hashed password (`generate_password_hash`) |
-| `role` | `String(120)` | Not Null, Default: `'admin'` | Access role (`admin`, `user`) |
+| `role` | `String(120)` | Not Null, Default: `'user'` | Access role (`admin`, `user`) |
 | `profile` | `String(80)` | Nullable | Stored filename of the original profile image |
 
 ### `BlockLog` Table (`block_logs`)
@@ -237,12 +237,18 @@ cp .env.example .env
 | `SECRET_KEY` | Yes | `secret` | Cryptographic secret for signing sessions & CSRF tokens |
 | `FLASK_APP` | No | `app.py` | Flask entry file |
 | `FLASK_DEBUG` | No | `1` | Enable/disable Flask debug mode |
+| `SQLALCHEMY_DATABASE_URI` | No | `sqlite:///mydb.sqlite3` | Database connection URI |
+| `STORE_NAME` | No | `TechStore` | Storefront branding name |
+| `STORE_TIMEZONE` | No | `Asia/Phnom_Penh` | Reporting & display timezone (GMT+7) |
+| `LOW_STOCK_THRESHOLD` | No | `5` | Fallback inventory alert threshold |
+| `GRACE_PERIOD_HOURS` | No | `4` | Auto-confirmation window for pending orders |
+| `SCHEDULER_ENABLED` | No | `True` | Enable APScheduler background jobs |
 | `TELEGRAM_BOT_TOKEN` | Optional | `""` | Bot token for sending customer order receipts |
 | `TELEGRAM_CHAT_ID` | Optional | `@SETEC_PP_SHOP` | Chat / Channel ID for order alerts |
 | `TELEGRAM_ALERT_BOT_TOKEN` | Optional | `""` | Bot token for security & rate-limit alerts |
 | `TELEGRAM_ALERT_CHAT_ID` | Optional | `@pp_shop_alert` | Chat / Channel ID for security alerts |
 
-> **Database Note**: The default database URI is SQLite (`sqlite:///mydb.sqlite3`). To switch to MySQL, update `config.py` with `mysql+pymysql://<user>:<password>@<host>/<database>` and install `pymysql`.
+> **Database Note**: The default database URI is SQLite (`sqlite:///mydb.sqlite3`). To switch to MySQL, update `config.py` or `.env` with `mysql+pymysql://<user>:<password>@<host>/<database>` and install `pymysql`.
 
 ---
 
@@ -250,7 +256,7 @@ cp .env.example .env
 
 Follow these steps to set up and run the project locally on your machine.
 
-### 1. Clone the Repository
+### 1. Clone the Repository & Check Out Work Branch
 ```bash
 git clone <repository-url>
 cd Flask
@@ -274,18 +280,30 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
-Copy `.env.example` to `.env` and fill in your settings:
+Copy `.env.example` to `.env` and configure your settings:
 ```bash
 cp .env.example .env
 ```
 
 ### 5. Apply Database Migrations
-Run Alembic migrations to ensure all database tables (`user`, `block_logs`) are created:
+Run Alembic migrations to create all database tables:
 ```bash
 flask db upgrade
 ```
 
-### 6. Start the Development Server
+### 6. Seed Product Catalog & Development Coupons
+Run the idempotent seed script to populate categories, products, default variants, and sample coupons:
+```bash
+python scripts/seed_catalog.py
+```
+
+### 7. Run Test Suite
+Verify that all system smoke tests pass:
+```bash
+pytest
+```
+
+### 8. Start the Development Server
 ```bash
 python app.py
 ```
@@ -293,6 +311,8 @@ Or alternatively:
 ```bash
 flask run --debug
 ```
+
+The application will start on `http://127.0.0.1:5000/`.
 
 The application will start on `http://127.0.0.1:5000/`.
 

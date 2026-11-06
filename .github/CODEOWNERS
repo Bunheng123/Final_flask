@@ -1,0 +1,32 @@
+# Core infrastructure (Team Lead)
+/models/            @team-lead
+/migrations/        @team-lead
+app.py              @team-lead
+config.py           @team-lead
+extensions.py       @team-lead
+requirements.txt    @team-lead
+docs/ARCHITECTURE.md @team-lead
+AGENTS.md           @team-lead
+
+# Workstream A (Catalog & Variants)
+admin/products.py         @teammate-a
+services/stock_service.py @teammate-a
+
+# Workstream B (Customer, Wishlist & Reviews)
+front/auth.py       @teammate-b
+front/account.py    @teammate-b
+front/wishlist.py   @teammate-b
+front/reviews.py    @teammate-b
+
+# Workstream C (Orders & Grace Period)
+front/checkout.py         @teammate-c
+admin/orders.py           @teammate-c
+services/order_service.py @teammate-c
+jobs/grace_period.py      @teammate-c
+
+# Workstream D (Coupons, Invoices & Reports)
+front/invoice.py          @teammate-d
+admin/coupons.py          @teammate-d
+admin/reports.py          @teammate-d
+services/coupon_service.py @teammate-d
+services/report_service.py @teammate-d
