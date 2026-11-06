@@ -33,6 +33,10 @@ cors.init_app(
     }
 )
 
+# Background Scheduler
+from jobs import init_scheduler
+init_scheduler(app)
+
 # Load Models
 import models
 

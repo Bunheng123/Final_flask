@@ -297,24 +297,47 @@ Run the idempotent seed script to populate categories, products, default variant
 python scripts/seed_catalog.py
 ```
 
-### 7. Run Test Suite
+### 7. Create Admin Account
+Create your local administrator user via CLI (replace with your secure password):
+```bash
+flask create-admin --username admin --email admin@techstore.test --password <your_secure_password>
+```
+
+### 8. Run Test Suite
 Verify that all system smoke tests pass:
 ```bash
 pytest
 ```
 
-### 8. Start the Development Server
-```bash
-python app.py
-```
-Or alternatively:
+### 9. Start the Development Server
 ```bash
 flask run --debug
 ```
 
 The application will start on `http://127.0.0.1:5000/`.
 
-The application will start on `http://127.0.0.1:5000/`.
+---
+
+## Team Rules & Architecture Standards
+
+All AI assistants and teammates MUST adhere strictly to these rules (detailed in `AGENTS.md` and `docs/OWNERS.md`):
+
+1. **Strict Ownership Boundaries**:
+   - Only edit files assigned to your workstream module (`M1` to `M5`).
+   - **Protected Core (DO NOT TOUCH)**: `models/*`, `migrations/*`, `app.py`, `config.py`, `extensions.py`, `requirements.txt`, `tests/conftest.py`, `docs/ARCHITECTURE.md`.
+2. **Business Logic in Services**:
+   - Routes in `front/` and `admin/` MUST remain thin: parse inputs, invoke domain services, and render responses.
+   - Implement business logic in `services/` (`stock_service.py`, `order_service.py`, `coupon_service.py`, `report_service.py`, `email_service.py`).
+3. **Mandatory Engineering Standards**:
+   - **Monetary amounts**: Always store integer cents in columns named `*_cents`. Use `helpers.money.to_cents()`, `from_cents()`, and `format_money()`.
+   - **Timestamps**: Always store naive UTC timestamps using `helpers.time.utc_now()`. Localize for presentation using `helpers.time.to_local(dt)`.
+   - **Telegram alerts**: Always dispatch alerts via `helpers.telegram.send_telegram()`. Runs asynchronously in background daemon threads and never blocks request handlers.
+   - **CSRF & Forms**: All state-changing operations MUST use `POST` and include the CSRF token: `<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>`.
+   - **Concurrency**: Decrement variant inventory using atomic SQL updates with row count validation (`WHERE stock >= :qty`). Do not use pessimistic table locks.
+4. **Git Workflow**:
+   - Branch from `develop` using `feature/<workstream-feature-name>`.
+   - Run `pytest` before pushing and ensure all tests pass.
+
 
 ---
 

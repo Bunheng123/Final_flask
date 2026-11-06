@@ -224,3 +224,52 @@ def test_test_safety_dev_database_unchanged(client):
     assert 'products' in tables, "Dev database 'products' table is missing!"
     assert 'customers' not in tables, "Dev database still has removed 'customers' table!"
 
+def test_auth_helpers(app):
+    """Test helpers/auth.py functions, decorators, and aliases."""
+    from helpers.auth import is_safe_next_url, login_required, customer_required, current_user, current_customer
+    assert is_safe_next_url('/admin/dashboard') is True
+    assert is_safe_next_url('/account/orders') is True
+    assert is_safe_next_url('http://evil.com') is False
+    assert is_safe_next_url('//evil.com') is False
+    assert is_safe_next_url('') is False
+    assert is_safe_next_url(None) is False
+
+    assert customer_required is login_required
+    assert current_customer is current_user
+
+    with app.test_request_context():
+        assert current_user() is None
+
+def test_new_stubs_501(client):
+    """Verify new endpoint stubs return 501 on POST and email service executes without error."""
+    # Coupon preview stub
+    res_coupon = client.post('/coupon/preview')
+    assert res_coupon.status_code == 501
+
+    # Admin login for admin variant stubs
+    client.post('/login', data={'email': 'admin@techstore.test', 'password': 'password123'})
+
+    res_add = client.post('/admin/product/1/variant/add')
+    assert res_add.status_code == 501
+
+    res_edit = client.post('/admin/variant/1/edit')
+    assert res_edit.status_code == 501
+
+    res_del = client.post('/admin/variant/1/delete')
+    assert res_del.status_code == 501
+
+    # Email service stub
+    from services.email_service import send_order_email
+    assert send_order_email(order=None, event='test') is True
+
+def test_partials_render_cleanly(client):
+    """Verify storefront product detail and checkout templates render partials without Jinja errors."""
+    res_checkout = client.get('/checkout')
+    assert res_checkout.status_code == 200
+    assert b"TechStore" in res_checkout.data
+
+    res_prod = client.get('/product/1')
+    assert res_prod.status_code == 200
+    assert b"TechStore" in res_prod.data
+
+
