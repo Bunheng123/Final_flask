@@ -46,6 +46,9 @@
             {{ product.name }}
           </h1>
 
+          <!-- Star Ratings Partial -->
+          {% include 'front/partials/_rating_stars.html' ignore missing %}
+
           <!-- Price -->
           <div class="mt-6 flex items-center gap-4">
             <span class="text-5xl font-bold text-white">
@@ -97,9 +100,19 @@
             </a>
 
           </div>
+
+          <!-- Wishlist Button Partial -->
+          <div class="mt-4">
+            {% include 'front/partials/_wishlist_button.html' ignore missing %}
+          </div>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Product Reviews Partial -->
+    <div class="max-w-7xl mx-auto px-6 mb-16">
+      {% include 'front/partials/_reviews.html' ignore missing %}
     </div>
 
     <!-- Related Products -->

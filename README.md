@@ -191,7 +191,7 @@ Stores user accounts for authentication and administration.
 | `username` | `String(80)` | Not Null | Account username |
 | `email` | `String(120)` | Unique, Not Null | Account email address |
 | `password` | `String(255)` | Not Null | Hashed password (`generate_password_hash`) |
-| `role` | `String(120)` | Not Null, Default: `'admin'` | Access role (`admin`, `user`) |
+| `role` | `String(120)` | Not Null, Default: `'user'` | Access role (`admin`, `user`) |
 | `profile` | `String(80)` | Nullable | Stored filename of the original profile image |
 
 ### `BlockLog` Table (`block_logs`)
@@ -237,12 +237,18 @@ cp .env.example .env
 | `SECRET_KEY` | Yes | `secret` | Cryptographic secret for signing sessions & CSRF tokens |
 | `FLASK_APP` | No | `app.py` | Flask entry file |
 | `FLASK_DEBUG` | No | `1` | Enable/disable Flask debug mode |
+| `SQLALCHEMY_DATABASE_URI` | No | `sqlite:///mydb.sqlite3` | Database connection URI |
+| `STORE_NAME` | No | `TechStore` | Storefront branding name |
+| `STORE_TIMEZONE` | No | `Asia/Phnom_Penh` | Reporting & display timezone (GMT+7) |
+| `LOW_STOCK_THRESHOLD` | No | `5` | Fallback inventory alert threshold |
+| `GRACE_PERIOD_HOURS` | No | `4` | Auto-confirmation window for pending orders |
+| `SCHEDULER_ENABLED` | No | `True` | Enable APScheduler background jobs |
 | `TELEGRAM_BOT_TOKEN` | Optional | `""` | Bot token for sending customer order receipts |
 | `TELEGRAM_CHAT_ID` | Optional | `@SETEC_PP_SHOP` | Chat / Channel ID for order alerts |
 | `TELEGRAM_ALERT_BOT_TOKEN` | Optional | `""` | Bot token for security & rate-limit alerts |
 | `TELEGRAM_ALERT_CHAT_ID` | Optional | `@pp_shop_alert` | Chat / Channel ID for security alerts |
 
-> **Database Note**: The default database URI is SQLite (`sqlite:///mydb.sqlite3`). To switch to MySQL, update `config.py` with `mysql+pymysql://<user>:<password>@<host>/<database>` and install `pymysql`.
+> **Database Note**: The default database URI is SQLite (`sqlite:///mydb.sqlite3`). To switch to MySQL, update `config.py` or `.env` with `mysql+pymysql://<user>:<password>@<host>/<database>` and install `pymysql`.
 
 ---
 
@@ -250,7 +256,7 @@ cp .env.example .env
 
 Follow these steps to set up and run the project locally on your machine.
 
-### 1. Clone the Repository
+### 1. Clone the Repository & Check Out Work Branch
 ```bash
 git clone <repository-url>
 cd Flask
@@ -274,27 +280,64 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
-Copy `.env.example` to `.env` and fill in your settings:
+Copy `.env.example` to `.env` and configure your settings:
 ```bash
 cp .env.example .env
 ```
 
 ### 5. Apply Database Migrations
-Run Alembic migrations to ensure all database tables (`user`, `block_logs`) are created:
+Run Alembic migrations to create all database tables:
 ```bash
 flask db upgrade
 ```
 
-### 6. Start the Development Server
+### 6. Seed Product Catalog & Development Coupons
+Run the idempotent seed script to populate categories, products, default variants, and sample coupons:
 ```bash
-python app.py
+python scripts/seed_catalog.py
 ```
-Or alternatively:
+
+### 7. Create Admin Account
+Create your local administrator user via CLI (replace with your secure password):
+```bash
+flask create-admin --username admin --email admin@techstore.test --password <your_secure_password>
+```
+
+### 8. Run Test Suite
+Verify that all system smoke tests pass:
+```bash
+pytest
+```
+
+### 9. Start the Development Server
 ```bash
 flask run --debug
 ```
 
 The application will start on `http://127.0.0.1:5000/`.
+
+---
+
+## Team Rules & Architecture Standards
+
+All AI assistants and teammates MUST adhere strictly to these rules (detailed in `AGENTS.md` and `docs/OWNERS.md`):
+
+1. **Strict Ownership Boundaries**:
+   - Only edit files assigned to your workstream module (`M1` to `M5`).
+   - **Protected Core (DO NOT TOUCH)**: `models/*`, `migrations/*`, `app.py`, `config.py`, `extensions.py`, `requirements.txt`, `tests/conftest.py`, `docs/ARCHITECTURE.md`.
+2. **Business Logic in Services**:
+   - Routes in `front/` and `admin/` MUST remain thin: parse inputs, invoke domain services, and render responses.
+   - Implement business logic in `services/` (`stock_service.py`, `order_service.py`, `coupon_service.py`, `report_service.py`, `email_service.py`).
+3. **Mandatory Engineering Standards**:
+   - **Monetary amounts**: Always store integer cents in columns named `*_cents`. Use `helpers.money.to_cents()`, `from_cents()`, and `format_money()`.
+   - **Timestamps**: Always store naive UTC timestamps using `helpers.time.utc_now()`. Localize for presentation using `helpers.time.to_local(dt)`.
+   - **Telegram alerts**: Always dispatch alerts via `helpers.telegram.send_telegram()`. Runs asynchronously in background daemon threads and never blocks request handlers.
+   - **CSRF & Forms**: All state-changing operations MUST use `POST` and include the CSRF token: `<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>`.
+   - **Concurrency**: Decrement variant inventory using atomic SQL updates with row count validation (`WHERE stock >= :qty`). Do not use pessimistic table locks.
+4. **Git Workflow**:
+   - Branch from `develop` using `feature/<workstream-feature-name>`.
+   - Run `pytest` before pushing and ensure all tests pass.
+
 
 ---
 

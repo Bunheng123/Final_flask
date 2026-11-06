@@ -70,6 +70,11 @@ def ratelimit_handler(error):
         }), 429
     return render_template(['Error/429.html', 'errors/429.html'], error=error, retry_after=retry_after), 429
 
+def forbidden_error(error):
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'status': 403, 'error': 'Forbidden', 'message': 'Access forbidden.'}), 403
+    return render_template(['Error/400.html', 'errors/400.html'], error=error, message="Access forbidden."), 403
+
 def internal_server_error(error):
     if request.path.startswith('/api/') or request.is_json:
         return jsonify({'status': 500, 'error': 'Internal Server Error', 'message': 'An internal server error occurred.'}), 500
@@ -77,12 +82,14 @@ def internal_server_error(error):
 
 # Attach error handlers to blueprint
 errors_bp.app_errorhandler(CSRFError)(csrf_error)
+errors_bp.app_errorhandler(403)(forbidden_error)
 errors_bp.app_errorhandler(404)(not_found_error)
 errors_bp.app_errorhandler(429)(ratelimit_handler)
 errors_bp.app_errorhandler(500)(internal_server_error)
 
 def register_error_handlers(app):
     app.register_error_handler(CSRFError, csrf_error)
+    app.register_error_handler(403, forbidden_error)
     app.register_error_handler(404, not_found_error)
     app.register_error_handler(429, ratelimit_handler)
     app.register_error_handler(500, internal_server_error)

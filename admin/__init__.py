@@ -1,13 +1,17 @@
-from flask import Blueprint, session, redirect, url_for, request
+from flask import Blueprint, session, redirect, url_for, request, abort
 
 admin_bp = Blueprint('admin_bp', __name__, template_folder='templates')
 
 @admin_bp.before_request
 def require_admin_login():
-    if request.endpoint in ('admin_bp.login', 'admin_bp.do_login', 'admin_bp.register', 'admin_bp.do_register', 'static'):
+    if request.endpoint in ('admin_bp.login', 'admin_bp.register', 'static'):
         return None
+
     if not session.get('is_login'):
-        return redirect(url_for('admin_bp.login'))
+        next_url = request.full_path if request.query_string else request.path
+        if next_url.endswith('?'):
+            next_url = next_url[:-1]
+        return redirect(url_for('front_bp.login', next=next_url))
 
     # Populate profile_image and user_role if missing in existing session
     if session.get('user_id') and not session.get('profile_image'):
@@ -17,8 +21,8 @@ def require_admin_login():
         if u:
             session['username'] = u['username']
             session['email'] = u['email']
-            session['role'] = u.get('role', 'admin')
-            session['user_role'] = u.get('role', 'admin')
+            session['role'] = u.get('role', 'user')
+            session['user_role'] = u.get('role', 'user')
             prof = u.get('profile')
             if prof:
                 session['profile_image'] = f"images/user/{get_thumb_name(prof)}"
@@ -27,4 +31,8 @@ def require_admin_login():
                 session['profile_image'] = "images/no-image.jpg"
                 session['profile'] = None
 
-from admin import dashboard, user, auth, block_log
+    if session.get('role') != 'admin' and session.get('user_role') != 'admin':
+        abort(403)
+
+from admin import dashboard, user, auth, block_log, products, orders, coupons, reports, variants, reviews
+

@@ -78,12 +78,15 @@
       </li>
       <li><hr class="border-t border-border my-1" /></li>
       <li>
-        <a
-          class="flex items-center px-4 py-2 text-xs font-medium text-rose hover:bg-rose/5 transition-colors"
-          href="{{ url_for('admin_bp.logout') }}"
-        >
-          <i class="bi bi-box-arrow-right me-2 text-rose text-sm"></i>Sign out
-        </a>
+        <form action="{{ url_for('front_bp.logout') }}" method="POST" class="block w-full m-0 p-0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button
+            type="submit"
+            class="w-full flex items-center px-4 py-2 text-xs font-medium text-rose hover:bg-rose/5 transition-colors bg-transparent border-0 cursor-pointer text-left"
+          >
+            <i class="bi bi-box-arrow-right me-2 text-rose text-sm"></i>Sign out
+          </button>
+        </form>
       </li>
     </ul>
   </div>

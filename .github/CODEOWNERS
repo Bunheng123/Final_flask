@@ -1,0 +1,45 @@
+# Core infrastructure (Team Lead)
+/models/            @team-lead
+/migrations/        @team-lead
+app.py              @team-lead
+config.py           @team-lead
+extensions.py       @team-lead
+requirements.txt    @team-lead
+docs/ARCHITECTURE.md @team-lead
+AGENTS.md           @team-lead
+tests/conftest.py   @team-lead
+
+# M1 (Catalog & Variants - Workstream A)
+admin/products.py         @teammate-a
+admin/variants.py         @teammate-a
+services/stock_service.py @teammate-a
+
+# M2 (User Accounts & Auth - Workstream B)
+front/auth.py       @teammate-b
+front/account.py    @teammate-b
+helpers/auth.py     @teammate-b
+services/auth_service.py @teammate-b
+
+# M3 (Orders & Grace Period - Workstream C)
+front/checkout.py         @teammate-c
+admin/orders.py           @teammate-c
+services/order_service.py @teammate-c
+services/email_service.py @teammate-c
+jobs/grace_period.py      @teammate-c
+
+# M4 (Coupons, Invoices & Reports - Workstream D)
+front/coupon.py           @teammate-d
+front/invoice.py          @teammate-d
+admin/coupons.py          @teammate-d
+admin/reports.py          @teammate-d
+services/coupon_service.py @teammate-d
+services/report_service.py @teammate-d
+templates/front/partials/_coupon_box.html @teammate-d
+
+# M5 (Wishlist & Reviews - Workstream B)
+front/wishlist.py   @teammate-b
+front/reviews.py    @teammate-b
+admin/reviews.py    @teammate-b
+templates/front/partials/_wishlist_button.html @teammate-b
+templates/front/partials/_rating_stars.html    @teammate-b
+templates/front/partials/_reviews.html         @teammate-b

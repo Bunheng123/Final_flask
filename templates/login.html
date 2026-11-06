@@ -134,21 +134,24 @@
 
           <!-- Login Form -->
           <form
-            action="{{ url_for('admin_bp.do_login') }}"
+            action="{{ url_for('front_bp.login') }}{% if next %}?next={{ next }}{% endif %}"
             method="POST"
             class="space-y-4"
             autocomplete="off"
           >
             <!-- CSRF Token -->
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
 
-            <!-- Username field -->
+            <!-- Email / Username field -->
             <div>
               <label
-                for="username"
+                for="email"
                 class="block text-xs font-semibold text-text mb-1.5"
               >
-                Username
+                Email or Username
               </label>
               <div class="relative">
                 <span
@@ -158,9 +161,9 @@
                 </span>
                 <input
                   type="text"
-                  id="username"
-                  name="username"
-                  placeholder="Username"
+                  id="email"
+                  name="email"
+                  placeholder="name@example.com or username"
                   required
                   class="w-full pl-10 pr-3.5 py-2.5 bg-paper/60 border border-border rounded-xl text-sm text-text placeholder:text-text-muted/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet/20 focus:border-violet transition-all"
                 />
@@ -215,7 +218,8 @@
 
         <!-- Footer Info -->
         <p class="text-center text-xs text-text-muted mt-6">
-          Protected system • Authorized personnel only
+          Don't have an account?
+          <a href="{{ url_for('front_bp.register') }}{% if next %}?next={{ next }}{% endif %}" class="text-violet font-semibold hover:underline ml-1">Create an account</a>
         </p>
       </div>
     </main>

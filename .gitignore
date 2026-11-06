@@ -8,6 +8,7 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # IDE & Editor settings
 .idea/
@@ -15,12 +16,24 @@ __pycache__/
 *.swp
 *.swo
 
-# Local SQLite databases & instance files
+# Local SQLite databases, instance & backup files
 *.sqlite
 *.sqlite3
 *.db
+*.bak
 identifier.sqlite
 instance/
+instance/*.sqlite3
+
+# Uploaded user images (keep placeholders)
+static/images/user/*
+!static/images/user/1_org_user2.jpg
+!static/images/user/1_thumb_user2.jpg
+!static/images/user/2_org_admin.jpg
+!static/images/user/2_thumb_admin.jpg
+!static/images/user/3_org_stock.jpg
+!static/images/user/3_thumb_stock.jpg
+!static/images/no-image.jpg
 
 # Flask / environment
 .env
