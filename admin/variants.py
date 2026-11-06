@@ -28,3 +28,4 @@ def variant_delete(variant_id: int):
     TODO: Workstream A / M1 - Delete a variant.
     """
     abort(501)
+

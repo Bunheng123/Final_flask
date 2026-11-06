@@ -15,3 +15,4 @@ def admin_reviews():
     if request.method == 'POST':
         abort(501)
     raise NotImplementedError("TODO: Workstream B / M5 - Implement reviews moderation")
+

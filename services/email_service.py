@@ -13,3 +13,4 @@ def send_order_email(order, event: str = "created"):
     """
     logger.info(f"[Email Service Stub] send_order_email called for order {getattr(order, 'order_number', order)} with event '{event}'")
     return True
+

@@ -13,3 +13,4 @@ def coupon_preview():
     TODO: Workstream D - Implement coupon preview calculation.
     """
     abort(501)
+

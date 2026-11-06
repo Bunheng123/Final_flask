@@ -71,3 +71,4 @@ def admin_required(f):
 # Aliases for storefront and workstream compatibility
 customer_required = login_required
 current_customer = current_user
+
