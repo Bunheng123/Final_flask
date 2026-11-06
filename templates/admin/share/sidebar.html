@@ -102,7 +102,7 @@
       >
     </a>
     <a
-      href="#"
+      href="{{ url_for('admin_bp.admin_orders') }}"
       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
     >
       <i
@@ -111,17 +111,35 @@
       <span>Orders</span>
       <span
         class="ml-auto bg-white/5 text-[10px] font-bold px-2 py-0.5 rounded-full text-text-invert group-hover:bg-white/10"
-        >37</span
+        >New</span
       >
     </a>
     <a
-      href="#"
+      href="{{ url_for('admin_bp.admin_products') }}"
       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
     >
       <i
         class="bi bi-box-seam-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
       ></i>
       <span>Products</span>
+    </a>
+    <a
+      href="{{ url_for('admin_bp.admin_coupons') }}"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+    >
+      <i
+        class="bi bi-ticket-perforated-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+      ></i>
+      <span>Coupons</span>
+    </a>
+    <a
+      href="{{ url_for('admin_bp.admin_reports') }}"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+    >
+      <i
+        class="bi bi-file-earmark-spreadsheet-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+      ></i>
+      <span>Reports</span>
     </a>
 
     <div
