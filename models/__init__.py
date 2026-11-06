@@ -3,7 +3,6 @@ from models.block_log import BlockLog
 from models.category import Category
 from models.product import Product
 from models.product_variant import ProductVariant
-from models.customer import Customer
 from models.order import Order
 from models.order_item import OrderItem
 from models.coupon import Coupon
@@ -17,7 +16,6 @@ __all__ = [
     'Category',
     'Product',
     'ProductVariant',
-    'Customer',
     'Order',
     'OrderItem',
     'Coupon',

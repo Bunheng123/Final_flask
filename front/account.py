@@ -6,7 +6,7 @@ from services.auth_service import login_required
 @login_required
 def account():
     """
-    Stub: Customer account overview and profile management.
+    Stub: User account overview and profile management.
     """
     if request.method == 'POST':
         abort(501)
@@ -16,7 +16,7 @@ def account():
 @login_required
 def account_orders():
     """
-    Stub: Customer orders list.
+    Stub: User orders list.
     """
     if request.method == 'POST':
         abort(501)
@@ -26,7 +26,7 @@ def account_orders():
 @login_required
 def account_order_detail(order_number: str):
     """
-    Stub: Customer order detail view.
+    Stub: User order detail view.
     """
     if request.method == 'POST':
         abort(501)

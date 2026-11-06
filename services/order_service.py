@@ -3,9 +3,9 @@ Order Service - Order creation, cancellation, and transition lifecycles.
 Owner: Workstream C (Orders & Grace Period)
 """
 
-def create_order(customer_data: dict, cart_items: list, coupon_code: str = None):
+def create_order(customer_data: dict, cart_items: list, coupon_code: str = None, user_id: int = None):
     """
-    Creates an order snapshot in the database, sets status='pending', and decrements stock.
+    Creates an order snapshot in the database (linking nullable user_id), sets status='pending', and decrements stock.
 
     TODO: Workstream C - Implement order creation logic.
     """

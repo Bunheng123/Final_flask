@@ -33,6 +33,12 @@ def app():
         orig_engine = sa_state.engines.get(None)
         sa_state.engines[None] = mem_engine
 
+        # Section I: Test Safety Check - fail immediately if active engine is not in-memory SQLite
+        active_url = str(_db.engine.url)
+        if not (active_url.startswith('sqlite') and (':memory:' in active_url or 'memory' in active_url)):
+            sa_state.engines[None] = orig_engine
+            pytest.fail(f"TEST SAFETY VIOLATION: Active database engine is not in-memory SQLite! URL: {active_url}")
+
         _db.create_all()
 
         # Seed test admin user and standard user for permission tests

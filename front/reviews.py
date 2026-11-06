@@ -1,6 +1,6 @@
 """
-Customer Product Reviews & Star Ratings.
-Owner: Workstream B (Customer, Wishlist & Reviews)
+Product Reviews & Star Ratings.
+Owner: Workstream B (User Accounts, Wishlist & Reviews)
 """
 from flask import request, session, redirect, url_for, jsonify
 from front import front_bp
@@ -9,6 +9,6 @@ from front import front_bp
 def add_review(product_id: int):
     """
     TODO: Workstream B - Submit rating (1-5) and text review for a product.
-    Requires customer login and verifies customer purchased product.
+    Requires user login and verifies user purchased product.
     """
     raise NotImplementedError("TODO: Workstream B - Submit Product Review")

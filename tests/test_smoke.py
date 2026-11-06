@@ -204,3 +204,23 @@ def test_time_helpers():
     assert now.tzinfo is None
     local_time = to_local(now)
     assert local_time.tzinfo is not None
+
+def test_test_safety_dev_database_unchanged(client):
+    """
+    Section I: Test Safety Verification.
+    Runs the suite client/fixture and confirms that instance/mydb.sqlite3 dev database
+    remains completely untouched and retains all tables.
+    """
+    import os
+    import sqlite3
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'instance', 'mydb.sqlite3'))
+    assert os.path.exists(db_path), f"Dev database file does not exist at {db_path}"
+    conn = sqlite3.connect(db_path)
+    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
+    conn.close()
+
+    assert 'user' in tables, "Dev database 'user' table is missing!"
+    assert 'orders' in tables, "Dev database 'orders' table is missing!"
+    assert 'products' in tables, "Dev database 'products' table is missing!"
+    assert 'customers' not in tables, "Dev database still has removed 'customers' table!"
+

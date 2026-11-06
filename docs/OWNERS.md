@@ -26,14 +26,14 @@ No teammate or AI agent may edit these files without explicit approval:
 
 ---
 
-## 👩‍💻 Workstream B: Customer Accounts, Wishlist & Reviews
+## 👩‍💻 Workstream B: User Accounts, Wishlist & Reviews
 - `front/auth.py`
 - `front/account.py`
 - `front/wishlist.py`
 - `front/reviews.py`
 - `templates/front/account/*`
 - `templates/front/wishlist/*`
-- Tests: `tests/test_customer_wishlist.py`
+- Tests: `tests/test_user_wishlist.py`
 
 ---
 

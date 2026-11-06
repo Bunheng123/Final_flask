@@ -3,7 +3,7 @@ Coupon Service - Promotional discount calculations, validation, and redemptions.
 Owner: Workstream D (Coupons, Invoicing & Reports)
 """
 
-def validate_coupon(code: str, subtotal_cents: int, customer_id: int = None) -> tuple[bool, str, int]:
+def validate_coupon(code: str, subtotal_cents: int, user_id: int = None) -> tuple[bool, str, int]:
     """
     Validates a coupon code against current cart subtotal and usage limits.
 
@@ -22,7 +22,7 @@ def apply_coupon(code: str, subtotal_cents: int) -> int:
     """
     raise NotImplementedError("TODO: Workstream D - Implement apply_coupon")
 
-def redeem(code: str, order_id: int, customer_id: int = None):
+def redeem(code: str, order_id: int, user_id: int = None):
     """
     Records a coupon redemption in coupon_redemptions and increments coupon used_count.
 
