@@ -28,10 +28,24 @@
         </span>
         {% endif %}
       </a>
-      {% if session.get('customer_id') %}
-        <a href="{{ url_for('front_bp.customer_account') }}" class="nav-link" id="nav-account">Account</a>
+      {% if session.get('is_login') %}
+        <span class="text-xs font-semibold text-slate-300 px-3 py-1.5 flex items-center gap-1.5 bg-slate-800/40 rounded-lg border border-slate-700/50">
+          <i class="bi bi-person-fill text-violet"></i>
+          {{ session.get('username') }}
+        </span>
+        {% if session.get('role') == 'admin' %}
+          <a href="{{ url_for('admin_bp.dashboard') }}" class="nav-link text-violet font-semibold" id="nav-admin">Admin</a>
+        {% endif %}
+        <a href="{{ url_for('front_bp.account') }}" class="nav-link" id="nav-account">Account</a>
+        <form action="{{ url_for('front_bp.logout') }}" method="POST" class="inline m-0 p-0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit" class="nav-link bg-transparent border-0 cursor-pointer text-slate-400 hover:text-white transition-colors" title="Logout">
+            Logout
+          </button>
+        </form>
       {% else %}
-        <a href="{{ url_for('front_bp.customer_login') }}" class="nav-link" id="nav-login">Sign In</a>
+        <a href="{{ url_for('front_bp.login') }}" class="nav-link" id="nav-login">Login</a>
+        <a href="{{ url_for('front_bp.register') }}" class="nav-link" id="nav-register">Register</a>
       {% endif %}
     </div>
 

@@ -9,6 +9,6 @@ def dashboard():
     module = 'dashboard'
 
     if not session.get('is_login'):
-        return redirect(url_for('admin_bp.login'))
+        return redirect(url_for('front_bp.login', next=url_for('admin_bp.dashboard')))
 
     return render_template('admin/dashboard/dashboard.html', module=module)

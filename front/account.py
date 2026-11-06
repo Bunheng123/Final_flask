@@ -1,14 +1,33 @@
-"""
-Customer Account - Profile settings and order history for authenticated shoppers.
-Owner: Workstream B (Customer, Wishlist & Reviews)
-"""
-from flask import render_template, session, redirect, url_for
+from flask import render_template, request, session, abort
 from front import front_bp
+from services.auth_service import login_required
 
-@front_bp.get('/customer/account', endpoint='customer_account')
-def customer_account():
+@front_bp.route('/account', methods=['GET', 'POST'], endpoint='account')
+@login_required
+def account():
     """
-    TODO: Workstream B - Display customer profile, saved addresses, and past order history.
-    Requires session.get('customer_id').
+    Stub: Customer account overview and profile management.
     """
-    raise NotImplementedError("TODO: Workstream B - Customer Account & Order History")
+    if request.method == 'POST':
+        abort(501)
+    raise NotImplementedError("TODO: Workstream B - Account overview")
+
+@front_bp.route('/account/orders', methods=['GET', 'POST'], endpoint='account_orders')
+@login_required
+def account_orders():
+    """
+    Stub: Customer orders list.
+    """
+    if request.method == 'POST':
+        abort(501)
+    raise NotImplementedError("TODO: Workstream B - Account orders")
+
+@front_bp.route('/account/orders/<order_number>', methods=['GET', 'POST'], endpoint='account_order_detail')
+@login_required
+def account_order_detail(order_number: str):
+    """
+    Stub: Customer order detail view.
+    """
+    if request.method == 'POST':
+        abort(501)
+    raise NotImplementedError("TODO: Workstream B - Account order detail")

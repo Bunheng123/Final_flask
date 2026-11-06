@@ -99,9 +99,12 @@
         {% endif %}
 
         <!-- Register Form -->
-        <form action="{{ url_for('admin_bp.do_register') }}" method="POST" class="space-y-4" autocomplete="off">
+        <form action="{{ url_for('front_bp.register') }}{% if next %}?next={{ next }}{% endif %}" method="POST" class="space-y-4" autocomplete="off">
           <!-- CSRF Token -->
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if next %}
+          <input type="hidden" name="next" value="{{ next }}">
+          {% endif %}
           
           <!-- Username field -->
           <div>
@@ -146,7 +149,7 @@
           <!-- Password field -->
           <div>
             <label for="password" class="block text-xs font-semibold text-text mb-1.5">
-              Password
+              Password (min. 8 characters)
             </label>
             <div class="relative">
               <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-muted/70 text-sm">
@@ -158,6 +161,7 @@
                 name="password"
                 placeholder="••••••••"
                 required
+                minlength="8"
                 class="w-full pl-10 pr-10 py-2.5 bg-paper/60 border border-border rounded-xl text-sm text-text placeholder:text-text-muted/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet/20 focus:border-violet transition-all"
               />
               <button
@@ -168,6 +172,27 @@
               >
                 <i class="bi bi-eye" id="toggleIcon"></i>
               </button>
+            </div>
+          </div>
+
+          <!-- Confirm Password field -->
+          <div>
+            <label for="confirm_password" class="block text-xs font-semibold text-text mb-1.5">
+              Confirm Password
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-muted/70 text-sm">
+                <i class="bi bi-lock-fill"></i>
+              </span>
+              <input
+                type="password"
+                id="confirm_password"
+                name="confirm_password"
+                placeholder="••••••••"
+                required
+                minlength="8"
+                class="w-full pl-10 pr-4 py-2.5 bg-paper/60 border border-border rounded-xl text-sm text-text placeholder:text-text-muted/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet/20 focus:border-violet transition-all"
+              />
             </div>
           </div>
 
@@ -183,7 +208,7 @@
 
         <div class="mt-6 text-center text-xs text-text-muted">
           Already have an account?
-          <a href="{{ url_for('admin_bp.login') }}" class="text-violet font-semibold hover:underline ml-1">Sign in</a>
+          <a href="{{ url_for('front_bp.login') }}{% if next %}?next={{ next }}{% endif %}" class="text-violet font-semibold hover:underline ml-1">Sign in</a>
         </div>
 
       </div>

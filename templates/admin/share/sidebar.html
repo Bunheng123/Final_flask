@@ -217,13 +217,16 @@
           >{{session.get('user_role', 'admin')}}</small
         >
       </div>
-      <a
-        href="{{ url_for('admin_bp.logout') }}"
-        class="text-white/40 hover:text-rose transition-colors text-base p-1.5 rounded-lg hover:bg-white/5 shrink-0"
-        title="Sign out"
-      >
-        <i class="bi bi-box-arrow-right"></i>
-      </a>
+      <form action="{{ url_for('front_bp.logout') }}" method="POST" class="inline m-0 p-0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button
+          type="submit"
+          class="text-white/40 hover:text-rose transition-colors text-base p-1.5 rounded-lg hover:bg-white/5 shrink-0 bg-transparent border-0 cursor-pointer"
+          title="Sign out"
+        >
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      </form>
     </div>
   </div>
 </aside>

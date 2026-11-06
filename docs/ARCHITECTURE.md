@@ -80,9 +80,27 @@ stateDiagram-v2
 
 ---
 
-## 4. Security Findings & Considerations for Lead
+## 4. Unified Authentication & Access Control
 
-1. **`/api/users` Public Email Exposure**
-   - In `api/user.py`, the endpoints `GET /api/users` and `GET /api/user/<id>` execute `SELECT id, username, email, role, profile FROM user` without authentication or authorization.
-   - This publicly exposes administrative and staff email addresses to any unauthenticated client.
-   - **Recommendation for Lead**: In a future workstream, restrict `/api/users` to authenticated administrators or sanitize the returned fields (omit `email` and password hashes).
+1. **Unified Routes at `/login` and `/register`**
+   - Canonical authentication routes: `GET/POST /login` (`front_bp.login`) and `GET/POST /register` (`front_bp.register`).
+   - Legacy routes `GET /admin/login` and `GET /admin/register` return HTTP 302 redirects to `/login` and `/register` preserving query parameters.
+   - Form processing occurs strictly in `services.auth_service`.
+   - Registration creates users with role `'user'` exclusively (ignoring any client-supplied `role` parameter) and auto-authenticates the user.
+   - Admin account creation is restricted to admin CRUD in `admin/user.py` or the CLI command `flask create-admin`.
+
+2. **Landing Redirect Logic**
+   - **Role `'admin'`**: Redirects to validated `next` parameter if present, otherwise `/admin/dashboard`.
+   - **Role `'user'`**: Redirects to validated `next` parameter if present (and not matching `/admin/*`), otherwise `/` (storefront home).
+
+3. **Logout Security**
+   - Logout requires `POST /logout` (`front_bp.logout`) with CSRF verification.
+   - `GET /admin/logout` redirects to `/` without clearing the session, preventing CSRF image/link injection attacks.
+
+4. **Rate Limiting**
+   - Stricter rate limiting is enforced on sensitive endpoints: `@limiter.limit("5 per minute", methods=["POST"])` on `/login` and `/register`.
+
+5. **API Authentication Hardening**
+   - `GET /api/users` and `GET /api/user/<id>` require an authenticated administrator session (`session.get('role') == 'admin'`), returning `401 Unauthorized` otherwise to protect user and customer emails.
+
+

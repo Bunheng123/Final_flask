@@ -63,6 +63,22 @@ csrf.exempt(api_bp)
 from errors import register_error_handlers
 register_error_handlers(app)
 
+# CLI Commands
+import click
+from services.auth_service import create_admin_user
+
+@app.cli.command('create-admin')
+@click.option('--username', prompt=True, help='Admin username')
+@click.option('--email', prompt=True, help='Admin email address')
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='Admin password')
+def create_admin(username, email, password):
+    """CLI command to create a new admin user."""
+    try:
+        user = create_admin_user(username, email, password)
+        click.echo(f"Admin user '{user.username}' ({user.email}) created successfully.")
+    except Exception as e:
+        click.echo(f"Error creating admin user: {e}", err=True)
+
 
 
 
