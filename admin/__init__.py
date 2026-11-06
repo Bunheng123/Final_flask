@@ -17,8 +17,8 @@ def require_admin_login():
         if u:
             session['username'] = u['username']
             session['email'] = u['email']
-            session['role'] = u.get('role', 'admin')
-            session['user_role'] = u.get('role', 'admin')
+            session['role'] = u.get('role', 'user')
+            session['user_role'] = u.get('role', 'user')
             prof = u.get('profile')
             if prof:
                 session['profile_image'] = f"images/user/{get_thumb_name(prof)}"
@@ -27,4 +27,7 @@ def require_admin_login():
                 session['profile_image'] = "images/no-image.jpg"
                 session['profile'] = None
 
-from admin import dashboard, user, auth, block_log
+    if session.get('role') != 'admin' and session.get('user_role') != 'admin':
+        return redirect(url_for('admin_bp.login'))
+
+from admin import dashboard, user, auth, block_log, products, orders, coupons, reports
