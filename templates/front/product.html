@@ -94,11 +94,12 @@
                 Select Specification / Variant:
               </label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="variantSelectorGroup">
-                {% for v in variants %}
-                <label class="cursor-pointer border {% if loop.first %}border-blue-500 bg-blue-500/10{% else %}border-slate-700 bg-slate-900{% endif %} rounded-2xl p-4 flex flex-col justify-between hover:border-blue-400 transition relative variant-card">
+                {% for v in variants if v.is_active %}
+                {% set is_selected = (product.default_variant and v.id == product.default_variant.id) or (not product.default_variant and loop.first) %}
+                <label class="cursor-pointer border {% if is_selected %}border-blue-500 bg-blue-500/10{% else %}border-slate-700 bg-slate-900{% endif %} rounded-2xl p-4 flex flex-col justify-between hover:border-blue-400 transition relative variant-card">
                   <div class="flex items-start justify-between">
                     <span class="font-semibold text-white text-sm">{{ v.spec_name }}</span>
-                    <input type="radio" name="variant_id" value="{{ v.id }}" {% if loop.first %}checked{% endif %}
+                    <input type="radio" name="variant_id" value="{{ v.id }}" {% if is_selected %}checked{% endif %}
                       class="accent-blue-500 variant-radio"
                       data-price="{{ v.price_formatted or ('$' ~ v.price) }}"
                       data-stock="{{ v.stock }}"
