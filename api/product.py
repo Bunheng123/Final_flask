@@ -6,11 +6,17 @@ from flask import jsonify, request
 from api import api_bp
 from services import stock_service
 from helpers.money import from_cents
+from models.product import Product
 
 
 def _serialize_product(p):
     active_vars = [v for v in p.variants if v.is_active]
-    default_var = next((v for v in active_vars if v.spec_name.lower() == 'default'), active_vars[0]) if active_vars else None
+    in_stock_vars = [v for v in active_vars if v.stock > 0]
+    if in_stock_vars:
+        default_var = next((v for v in in_stock_vars if v.spec_name.lower() == 'default'), in_stock_vars[0])
+    else:
+        default_var = next((v for v in active_vars if v.spec_name.lower() == 'default'), active_vars[0]) if active_vars else None
+
     price = from_cents(default_var.price_cents) if default_var else 0.0
     stock = sum(v.stock for v in active_vars) if active_vars else 0
     cat_name = p.category.name if p.category else ""
@@ -56,7 +62,8 @@ def api_products():
         search=search
     )
 
-    if db_products:
+    db_has_products = Product.query.first() is not None
+    if db_has_products or db_products:
         result = [_serialize_product(p) for p in db_products]
         return jsonify({
             "success": True,
@@ -87,17 +94,24 @@ def api_products():
 @api_bp.get('/products/<int:product_id>', endpoint='get_product_by_id')
 @api_bp.get('/product/<int:product_id>', endpoint='get_product_detail')
 def api_product_detail(product_id: int):
-    p = stock_service.get_product_by_id(product_id, only_active=True)
+    p = stock_service.get_storefront_product_by_id(product_id)
     if p:
         return jsonify({
             "success": True,
             "data": _serialize_product(p)
         })
 
-    # Fallback to mock catalog
+    # If database has products, return 404 for out of stock / inactive / non-existent product
+    if Product.query.first() is not None:
+        return jsonify({
+            "success": False,
+            "error": "Product not found"
+        }), 404
+
+    # Fallback to mock catalog for unseeded environments
     from product import get_product_by_id as mock_get_by_id
     mock_p = mock_get_by_id(product_id)
-    if not mock_p:
+    if not mock_p or int(mock_p.get('stock', 0)) <= 0:
         return jsonify({
             "success": False,
             "error": "Product not found"

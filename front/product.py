@@ -25,6 +25,7 @@ def all_products():
     """
     Storefront product listing view.
     Delegates querying to stock_service and supports category, brand, and live search filters.
+    Only products with active in-stock variants are returned to customers.
     """
     module = 'products'
     category = request.args.get('category') or request.args.get('category_id')
@@ -39,8 +40,11 @@ def all_products():
     categories = stock_service.get_all_categories()
     brands = stock_service.get_all_brands()
 
-    if not products_list and not category and not brand and not search:
-        # Fallback to mock catalog if database has not been seeded
+    from models.product import Product
+    db_has_products = Product.query.first() is not None
+
+    if not products_list and not category and not brand and not search and not db_has_products:
+        # Fallback to mock catalog only if database has not been seeded
         from product import products as mock_products
         products_list = mock_products
 
@@ -62,14 +66,20 @@ def product(product_id: int):
     """
     Storefront product detail view.
     Loads database-backed product and active variants with formatted pricing.
+    Returns 404 if product is inactive, has no active variants, or all active variants have stock <= 0.
     """
     module = 'product_detail'
-    product_item = stock_service.get_product_by_id(product_id, only_active=True)
+    product_item = stock_service.get_storefront_product_by_id(product_id)
     if product_item is None:
+        from models.product import Product
+        if Product.query.first() is not None:
+            # Product does not exist, is inactive, or has 0 stock across all active variants
+            abort(404)
+
         # Fallback to mock catalog for backwards-compatibility with unseeded test fixtures
         from product import get_product_by_id as mock_get_by_id, get_product_by_category as mock_get_by_cat
         product_item = mock_get_by_id(product_id)
-        if product_item is None:
+        if product_item is None or int(product_item.get('stock', 0)) <= 0:
             abort(404)
         related_product = mock_get_by_cat(product_item.get('category'))
         return render_template(
