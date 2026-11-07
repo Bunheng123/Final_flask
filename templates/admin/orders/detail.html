@@ -1,0 +1,150 @@
+{% extends 'admin/master.html' %}
+
+{% block tab_title %}Order #{{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+  <!-- Top Navigation & Status -->
+  <div class="flex items-center justify-between">
+    <a href="{{ url_for('admin_bp.admin_orders') }}" class="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text font-semibold transition-colors">
+      <i class="bi bi-arrow-left"></i> Back to Orders
+    </a>
+    <div>
+      {% if order.status == 'pending' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Pending
+        </span>
+      {% elif order.status == 'confirmed' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-500/10 border border-teal-500/30 text-teal-400">
+          <i class="bi bi-check2"></i> Confirmed
+        </span>
+      {% elif order.status == 'shipped' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-400">
+          <i class="bi bi-truck"></i> Shipped
+        </span>
+      {% elif order.status == 'delivered' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+          <i class="bi bi-check-circle-fill"></i> Delivered
+        </span>
+      {% else %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 border border-rose-500/30 text-rose-400">
+          <i class="bi bi-x-circle"></i> Cancelled
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Main Card -->
+  <div class="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border pb-4">
+      <div>
+        <h2 class="font-mono text-xl font-bold text-text flex items-center gap-2">
+          <i class="bi bi-receipt text-violet"></i> {{ order.order_number }}
+        </h2>
+        {% set local_dt = to_local(order.created_at) %}
+        <p class="text-xs text-text-muted mt-0.5">Placed on {{ local_dt.strftime('%B %d, %Y at %I:%M %p') if local_dt else '—' }} (GMT+7)</p>
+      </div>
+      <div class="text-right">
+        <span class="text-xs text-text-muted">Total Amount</span>
+        <div class="font-mono text-xl font-bold text-violet">{{ format_money(order.total_cents) }}</div>
+      </div>
+    </div>
+
+    <!-- Customer & Payment Metadata -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-paper border border-border rounded-xl p-4 text-xs space-y-2">
+        <h3 class="font-bold uppercase tracking-wider text-violet text-[11px] flex items-center gap-1.5">
+          <i class="bi bi-person"></i> Customer Details
+        </h3>
+        <p><strong>Name:</strong> {{ order.customer_name }}</p>
+        <p><strong>Email:</strong> {{ order.email }}</p>
+        <p><strong>Phone:</strong> <span class="font-mono">{{ order.phone }}</span></p>
+        <p class="pt-2 border-t border-border"><strong>Delivery Address:</strong><br><span class="text-text-muted leading-relaxed">{{ order.address }}</span></p>
+      </div>
+
+      <div class="bg-paper border border-border rounded-xl p-4 text-xs space-y-2">
+        <h3 class="font-bold uppercase tracking-wider text-violet text-[11px] flex items-center gap-1.5">
+          <i class="bi bi-credit-card"></i> Payment & Bakong MD5 Hash
+        </h3>
+        <p><strong>Payment Method:</strong> <span class="uppercase font-mono px-2 py-0.5 rounded bg-card border border-border">{{ order.payment_method }}</span></p>
+        <div>
+          <strong class="block mb-1">Bakong MD5 Hash:</strong>
+          <div class="flex items-center gap-2 bg-card border border-border rounded-lg p-2 font-mono text-xs">
+            <span class="text-violet truncate flex-1 font-bold">{{ order.bakong_hash }}</span>
+            <button type="button" onclick="navigator.clipboard.writeText('{{ order.bakong_hash }}'); this.innerText='Copied!';"
+                    class="bg-violet hover:bg-[#5b4de8] text-white px-2.5 py-1 rounded text-[11px] font-sans font-semibold transition-colors">
+              Copy Hash
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <div class="border border-border rounded-xl overflow-hidden bg-paper">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-card border-b border-border uppercase text-[10px] text-text-muted font-bold">
+          <tr>
+            <th class="px-4 py-3">Item & Spec</th>
+            <th class="px-4 py-3 font-mono">SKU</th>
+            <th class="px-4 py-3 text-center">Qty</th>
+            <th class="px-4 py-3 text-right">Unit Price</th>
+            <th class="px-4 py-3 text-right">Line Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border font-mono text-[11px]">
+          {% for item in order.items %}
+            <tr class="hover:bg-card/40 transition-colors">
+              <td class="px-4 py-3">
+                <div class="font-sans font-semibold text-text">{{ item.product_name }}</div>
+                <div class="text-[10px] text-text-muted">{{ item.spec_name }}</div>
+              </td>
+              <td class="px-4 py-3 text-text-muted">{{ item.sku }}</td>
+              <td class="px-4 py-3 text-center font-bold text-text">{{ item.qty }}</td>
+              <td class="px-4 py-3 text-right text-text-muted">{{ format_money(item.unit_price_cents) }}</td>
+              <td class="px-4 py-3 text-right font-bold text-text">{{ format_money(item.line_total_cents) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="pt-4 border-t border-border flex items-center justify-end gap-3">
+      {% if order.status == 'pending' %}
+        <form action="{{ url_for('admin_bp.admin_update_order_status', order_id=order.id) }}" method="POST" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input type="hidden" name="status" value="confirmed"/>
+          <button type="submit" class="bg-teal hover:bg-teal-600 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors">
+            Confirm Order
+          </button>
+        </form>
+        <form action="{{ url_for('admin_bp.admin_update_order_status', order_id=order.id) }}" method="POST" class="inline" onsubmit="return confirm('Cancel order?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input type="hidden" name="status" value="cancelled"/>
+          <button type="submit" class="bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 font-semibold text-xs px-4 py-2 rounded-lg transition-colors">
+            Cancel Order
+          </button>
+        </form>
+      {% elif order.status == 'confirmed' %}
+        <form action="{{ url_for('admin_bp.admin_update_order_status', order_id=order.id) }}" method="POST" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input type="hidden" name="status" value="shipped"/>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors">
+            Mark as Shipped
+          </button>
+        </form>
+      {% elif order.status == 'shipped' %}
+        <form action="{{ url_for('admin_bp.admin_update_order_status', order_id=order.id) }}" method="POST" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input type="hidden" name="status" value="delivered"/>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors">
+            Mark as Delivered
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

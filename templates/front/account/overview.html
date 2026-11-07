@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% include 'front/share/header.html' %}
+    <title>My Account — TechStore</title>
+  </head>
+  <body class="bg-slate-900 text-white min-h-screen flex flex-col">
+    {% include 'front/share/navbar.html' %}
+
+    <main class="flex-1 max-w-7xl mx-auto px-6 py-10 w-full">
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-6 space-y-2">
+            {% for category, message in messages %}
+              <div class="p-4 rounded-2xl text-sm font-medium flex items-center justify-between border {% if category == 'success' %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% else %}bg-rose-500/10 border-rose-500/30 text-rose-300{% endif %}">
+                <span>{{ message }}</span>
+                <button onclick="this.parentElement.remove()" class="text-xs opacity-70 hover:opacity-100">&times;</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 class="text-3xl font-extrabold tracking-tight">Account Dashboard</h1>
+          <p class="text-slate-400 text-sm mt-1">Manage your orders, profile, and store credits.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="{{ url_for('front_bp.account_orders') }}" class="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-cyan-500 text-slate-950 font-bold px-5 py-2.5 rounded-2xl hover:brightness-110 transition shadow-lg shadow-indigo-500/20 text-sm">
+            <i class="bi bi-bag-check-fill"></i> View All Orders
+          </a>
+        </div>
+      </div>
+
+      <!-- Account Summary Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl">
+          <div class="flex items-center gap-3 text-indigo-400 mb-2">
+            <i class="bi bi-person-circle text-2xl"></i>
+            <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Profile</span>
+          </div>
+          <div class="text-xl font-bold text-white">{{ user.username }}</div>
+          <div class="text-slate-400 text-xs mt-0.5 truncate">{{ user.email }}</div>
+        </div>
+
+        <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl">
+          <div class="flex items-center gap-3 text-cyan-400 mb-2">
+            <i class="bi bi-wallet2 text-2xl"></i>
+            <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Store Credit Balance</span>
+          </div>
+          <div class="text-2xl font-mono font-bold text-cyan-300">${{ "%.2f"|format(user_balance) }}</div>
+          <div class="text-slate-400 text-xs mt-0.5">Automated 100% refund from cancelled orders</div>
+        </div>
+
+        <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl">
+          <div class="flex items-center gap-3 text-emerald-400 mb-2">
+            <i class="bi bi-clock-history text-2xl"></i>
+            <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Self-Service Window</span>
+          </div>
+          <div class="text-xl font-bold text-white">4-Hour Cancellation</div>
+          <div class="text-slate-400 text-xs mt-0.5">Pending orders are cancellable for full store credit</div>
+        </div>
+      </div>
+
+      <!-- Recent Orders Section -->
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-3xl p-6 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold flex items-center gap-2">
+            <i class="bi bi-clock-history text-indigo-400"></i> Recent Orders
+          </h2>
+          <a href="{{ url_for('front_bp.account_orders') }}" class="text-indigo-400 hover:text-indigo-300 text-sm font-semibold flex items-center gap-1">
+            See all <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+
+        {% if recent_orders %}
+          <div class="divide-y divide-slate-700/60">
+            {% for order in recent_orders %}
+              {% set local_dt = to_local(order.created_at) %}
+              <div class="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <a href="{{ url_for('front_bp.account_order_detail', order_number=order.order_number) }}" class="font-mono font-bold text-indigo-300 hover:underline">
+                    {{ order.order_number }}
+                  </a>
+                  <div class="text-xs text-slate-400 mt-0.5">
+                    Placed {{ local_dt.strftime('%b %d, %Y at %I:%M %p') if local_dt else '—' }}
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                  <div class="text-right">
+                    <div class="font-mono font-bold text-white">{{ format_money(order.total_cents) }}</div>
+                    <div class="text-[11px] text-slate-400">{{ order.items|length }} item(s)</div>
+                  </div>
+
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold uppercase {% if order.status == 'pending' %}bg-amber-500/10 text-amber-300 border border-amber-500/30{% elif order.status == 'confirmed' %}bg-teal-500/10 text-teal-300 border border-teal-500/30{% elif order.status == 'shipped' %}bg-blue-500/10 text-blue-300 border border-blue-500/30{% elif order.status == 'delivered' %}bg-emerald-500/10 text-emerald-300 border border-emerald-500/30{% else %}bg-rose-500/10 text-rose-300 border border-rose-500/30{% endif %}">
+                    {{ order.status }}
+                  </span>
+
+                  <a href="{{ url_for('front_bp.account_order_detail', order_number=order.order_number) }}" class="p-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white transition text-xs font-semibold">
+                    Details
+                  </a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-12 text-slate-400">
+            <i class="bi bi-bag-x text-4xl block mb-2 opacity-50"></i>
+            <p>You haven't placed any orders yet.</p>
+            <a href="{{ url_for('front_bp.products') }}" class="inline-block mt-3 text-indigo-400 hover:underline text-sm font-semibold">
+              Browse Store Catalog &rarr;
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </main>
+
+    {% include 'front/share/footer.html' %}
+  </body>
+</html>
+
