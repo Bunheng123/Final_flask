@@ -28,24 +28,28 @@
     </div>
   </div>
 
-  <!-- Date Range Filter Bar -->
+  <!-- Date Range Filter Bar with Auto-Filtering -->
   <div class="bg-card border border-border rounded-2xl p-4 shadow-sm">
-    <form method="GET" action="{{ url_for('admin_bp.admin_reports') }}" class="flex flex-col sm:flex-row items-center gap-3">
+    <form id="report_filter_form" method="GET" action="{{ url_for('admin_bp.admin_reports') }}" class="flex flex-col sm:flex-row items-center gap-3">
       <div class="flex items-center gap-2 w-full sm:w-auto">
-        <label class="text-xs font-bold text-text-muted whitespace-nowrap">From:</label>
+        <label for="report_start_date" class="text-xs font-bold text-text-muted whitespace-nowrap">From:</label>
         <input
           type="date"
+          id="report_start_date"
           name="start_date"
           value="{{ start_date or '' }}"
+          onchange="handleDateChange()"
           class="bg-paper border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
         />
       </div>
       <div class="flex items-center gap-2 w-full sm:w-auto">
-        <label class="text-xs font-bold text-text-muted whitespace-nowrap">To:</label>
+        <label for="report_end_date" class="text-xs font-bold text-text-muted whitespace-nowrap">To:</label>
         <input
           type="date"
+          id="report_end_date"
           name="end_date"
           value="{{ end_date or '' }}"
+          onchange="handleDateChange()"
           class="bg-paper border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
         />
       </div>
@@ -68,9 +72,9 @@
     </form>
   </div>
 
-  <!-- KPI Cards -->
+  <!-- Professional KPI Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-    <!-- Gross Sales -->
+    <!-- 1. Gross Sales -->
     <div class="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col justify-between">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-bold uppercase tracking-wider text-text-muted">Gross Sales</span>
@@ -79,14 +83,18 @@
         </div>
       </div>
       <div>
-        <div class="font-mono text-2xl font-bold text-text">{{ sales.gross_sales_formatted }}</div>
-        <div class="text-[11px] text-text-muted mt-1">
-          From {{ sales.total_orders }} recorded orders
+        <div class="flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-text">{{ sales.gross_sales_formatted }}</span>
+          <span class="text-[11px] font-semibold text-text-muted">≈ {{ sales.gross_sales_khr }}</span>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-text-muted mt-2 pt-2 border-t border-border">
+          <span>AOV: <strong class="text-text font-mono">{{ sales.aov_formatted }}</strong></span>
+          <span>{{ sales.total_orders }} orders</span>
         </div>
       </div>
     </div>
 
-    <!-- Net Realized Revenue -->
+    <!-- 2. Net Realized Revenue -->
     <div class="bg-teal-light border border-teal/15 rounded-2xl p-5 flex flex-col justify-between">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-bold uppercase tracking-wider text-teal">Net Realized Revenue</span>
@@ -95,14 +103,18 @@
         </div>
       </div>
       <div>
-        <div class="font-mono text-2xl font-bold text-text">{{ sales.net_revenue_formatted }}</div>
-        <div class="text-[11px] text-teal font-medium mt-1">
-          {{ sales.completed_orders_count }} completed orders
+        <div class="flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-text">{{ sales.net_revenue_formatted }}</span>
+          <span class="text-[11px] font-semibold text-teal">≈ {{ sales.net_revenue_khr }}</span>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-teal mt-2 pt-2 border-t border-teal/15">
+          <span>Realized: <strong>{{ sales.realization_rate }}</strong></span>
+          <span>{{ sales.completed_orders_count }} fulfilled</span>
         </div>
       </div>
     </div>
 
-    <!-- Promotional Discounts -->
+    <!-- 3. Promotional Discounts -->
     <div class="bg-amber-light border border-amber/15 rounded-2xl p-5 flex flex-col justify-between">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-bold uppercase tracking-wider text-amber">Discounts Claimed</span>
@@ -111,14 +123,18 @@
         </div>
       </div>
       <div>
-        <div class="font-mono text-2xl font-bold text-text">-{{ sales.discount_formatted }}</div>
-        <div class="text-[11px] text-amber font-medium mt-1">
-          Applied promo coupons
+        <div class="flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-text">-{{ sales.discount_formatted }}</span>
+          <span class="text-[11px] font-semibold text-amber">{{ sales.discount_rate }} of sales</span>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-amber mt-2 pt-2 border-t border-amber/15">
+          <span>Promotions Claimed</span>
+          <span>Coupon codes</span>
         </div>
       </div>
     </div>
 
-    <!-- Warehouse Inventory Valuation -->
+    <!-- 4. Warehouse Inventory Valuation -->
     <div class="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col justify-between">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-bold uppercase tracking-wider text-text-muted">Inventory Valuation</span>
@@ -127,9 +143,13 @@
         </div>
       </div>
       <div>
-        <div class="font-mono text-2xl font-bold text-text">{{ inventory.total_retail_valuation_formatted }}</div>
-        <div class="text-[11px] text-text-muted mt-1">
-          {{ inventory.total_units }} units across {{ inventory.total_skus }} SKUs
+        <div class="flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-text">{{ inventory.total_retail_valuation_formatted }}</span>
+          <span class="text-[11px] font-semibold text-text-muted">≈ {{ inventory.total_retail_valuation_khr }}</span>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-text-muted mt-2 pt-2 border-t border-border">
+          <span>Cost: <strong class="text-text font-mono">{{ inventory.total_cost_valuation_formatted }}</strong></span>
+          <span class="text-teal font-semibold">{{ inventory.margin_percent }} margin</span>
         </div>
       </div>
     </div>
@@ -174,8 +194,11 @@
         </button>
       </div>
 
-      <div class="text-[11px] text-text-muted pb-2 hidden sm:block">
-        Accounting Ledger Mode
+      <div class="text-[11px] text-text-muted pb-2 hidden sm:flex items-center gap-3">
+        <span>Accounting Ledger Mode</span>
+        <a href="{{ url_for('admin_bp.admin_orders') }}" class="text-violet hover:underline flex items-center gap-1 font-semibold">
+          Orders Tab <i class="bi bi-arrow-right"></i>
+        </a>
       </div>
     </div>
 
@@ -200,7 +223,11 @@
             {% if sales.orders %}
               {% for o in sales.orders %}
               <tr class="hover:bg-paper/40 transition">
-                <td class="py-3.5 px-5 font-mono font-bold text-violet">{{ o.order_number }}</td>
+                <td class="py-3.5 px-5 font-mono font-bold text-violet">
+                  <a href="{{ url_for('admin_bp.admin_orders') }}" class="hover:underline" title="View order details in Orders tab">
+                    {{ o.order_number }}
+                  </a>
+                </td>
                 <td class="py-3.5 px-5 text-text-muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '—' }}</td>
                 <td class="py-3.5 px-5">
                   <div class="font-medium text-text">{{ o.customer_name }}</div>
@@ -295,13 +322,18 @@
           Estimated profit margin across current stock: 
           <span class="font-bold text-teal">{{ inventory.potential_profit_formatted }}</span>
         </div>
-        <div class="flex gap-2 text-xs">
-          <span class="bg-amber-light text-amber border border-amber/20 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
-            <i class="bi bi-exclamation-triangle-fill"></i> Low Stock: {{ inventory.low_stock_count }}
-          </span>
-          <span class="bg-rose-light text-rose border border-rose/20 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
-            <i class="bi bi-x-circle-fill"></i> Out of Stock: {{ inventory.out_of_stock_count }}
-          </span>
+        <div class="flex items-center gap-3 text-xs">
+          <div class="flex gap-2">
+            <span class="bg-amber-light text-amber border border-amber/20 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
+              <i class="bi bi-exclamation-triangle-fill"></i> Low Stock: {{ inventory.low_stock_count }}
+            </span>
+            <span class="bg-rose-light text-rose border border-rose/20 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
+              <i class="bi bi-x-circle-fill"></i> Out of Stock: {{ inventory.out_of_stock_count }}
+            </span>
+          </div>
+          <a href="{{ url_for('admin_bp.admin_products') }}" class="text-violet hover:underline font-semibold flex items-center gap-1 ml-2">
+            Products Tab <i class="bi bi-arrow-right"></i>
+          </a>
         </div>
       </div>
       <div class="overflow-x-auto max-h-[480px]">
@@ -322,7 +354,11 @@
             {% if inventory.variant_items %}
               {% for item in inventory.variant_items %}
               <tr class="hover:bg-paper/40 transition">
-                <td class="py-3 px-5 font-mono font-bold text-violet">{{ item.sku }}</td>
+                <td class="py-3 px-5 font-mono font-bold text-violet">
+                  <a href="{{ url_for('admin_bp.admin_products') }}" class="hover:underline" title="Manage product in Products tab">
+                    {{ item.sku }}
+                  </a>
+                </td>
                 <td class="py-3 px-5 font-semibold">{{ item.product_name }}</td>
                 <td class="py-3 px-5 text-text-muted">{{ item.spec_name }}</td>
                 <td class="py-3 px-5 text-center font-mono font-bold">{{ item.stock }}</td>
@@ -359,6 +395,15 @@
 </div>
 
 <script>
+function handleDateChange() {
+  const start = document.getElementById('report_start_date').value;
+  const end = document.getElementById('report_end_date').value;
+  // Auto-submit as soon as both From and To are selected
+  if (start && end) {
+    document.getElementById('report_filter_form').submit();
+  }
+}
+
 function switchReportTab(tabKey) {
   // Update button active styles
   document.querySelectorAll('.report-tab-btn').forEach(btn => {

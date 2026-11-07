@@ -18,6 +18,7 @@ from models.product import Product
 from models.product_variant import ProductVariant
 from helpers.money import from_cents, format_money
 from helpers.time import to_local
+from config import Config
 
 
 def _parse_date(d_val) -> Optional[datetime]:
@@ -94,6 +95,14 @@ def generate_sales_report(start_date=None, end_date=None) -> Dict[str, Any]:
 
     daily_breakdown = sorted(daily_dict.values(), key=lambda x: x['date'], reverse=True)
 
+    khr_rate = getattr(Config, 'KHR_RATE', 4000.0)
+    aov_cents = (gross_sales_cents // total_orders) if total_orders > 0 else 0
+    realization_rate = (len(completed_orders) / total_orders * 100.0) if total_orders > 0 else 0.0
+    discount_rate = (discount_cents / gross_sales_cents * 100.0) if gross_sales_cents > 0 else 0.0
+
+    gross_khr = f"{int(round((gross_sales_cents / 100.0) * khr_rate)):,} ៛"
+    net_khr = f"{int(round((net_revenue_cents / 100.0) * khr_rate)):,} ៛"
+
     return {
         'total_orders': total_orders,
         'completed_orders_count': len(completed_orders),
@@ -101,10 +110,16 @@ def generate_sales_report(start_date=None, end_date=None) -> Dict[str, Any]:
         'cancelled_orders_count': len(cancelled_orders),
         'gross_sales_cents': gross_sales_cents,
         'gross_sales_formatted': format_money(gross_sales_cents),
+        'gross_sales_khr': gross_khr,
+        'aov_cents': aov_cents,
+        'aov_formatted': format_money(aov_cents),
+        'realization_rate': f"{realization_rate:.1f}%",
         'discount_cents': discount_cents,
         'discount_formatted': format_money(discount_cents),
+        'discount_rate': f"{discount_rate:.1f}%",
         'net_revenue_cents': net_revenue_cents,
         'net_revenue_formatted': format_money(net_revenue_cents),
+        'net_revenue_khr': net_khr,
         'orders': orders,
         'daily_breakdown': daily_breakdown,
         'start_date': start_dt.strftime("%Y-%m-%d") if start_dt else "",
@@ -162,15 +177,21 @@ def generate_inventory_valuation() -> Dict[str, Any]:
             'is_out_of_stock': v.stock == 0
         })
 
+    margin_percent = ((total_retail_cents - total_cost_cents) / total_retail_cents * 100.0) if total_retail_cents > 0 else 0.0
+    khr_rate = getattr(Config, 'KHR_RATE', 4000.0)
+    inventory_khr = f"{int(round((total_retail_cents / 100.0) * khr_rate)):,} ៛"
+
     return {
         'total_skus': total_skus,
         'total_units': total_units,
         'total_retail_valuation_cents': total_retail_cents,
         'total_retail_valuation_formatted': format_money(total_retail_cents),
+        'total_retail_valuation_khr': inventory_khr,
         'total_cost_valuation_cents': total_cost_cents,
         'total_cost_valuation_formatted': format_money(total_cost_cents),
         'potential_profit_cents': total_retail_cents - total_cost_cents,
         'potential_profit_formatted': format_money(total_retail_cents - total_cost_cents),
+        'margin_percent': f"{margin_percent:.1f}%",
         'low_stock_count': low_stock_count,
         'out_of_stock_count': out_of_stock_count,
         'variant_items': items,

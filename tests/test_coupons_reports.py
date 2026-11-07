@@ -453,3 +453,4 @@ def test_admin_coupons_crud(client, seed_data):
     res_delete = client.post(f'/admin/coupons/delete/{updated.id}', follow_redirects=True)
     assert res_delete.status_code == 200
     assert Coupon.query.get(updated.id) is None
+
