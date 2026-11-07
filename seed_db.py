@@ -9,6 +9,8 @@ Usage:
 """
 import os
 import sys
+import random
+from typing import Optional
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 if BASE_DIR not in sys.path:
@@ -35,9 +37,9 @@ def slugify(text: str) -> str:
     return re.sub(r'[-\s]+', '-', text_val).strip('-')
 
 
-def seed_database(test_price_cents: int = 1):
+def seed_database(test_price_cents: Optional[int] = None):
     print("=" * 60)
-    print(" Initializing Database & Seeding Catalog with 1-Cent Test Prices")
+    print(" Initializing Database & Seeding Catalog with Random Test Prices ($0.01 - $0.03)")
     print("=" * 60)
 
     # 1. Create all database tables if they do not exist
@@ -115,7 +117,7 @@ def seed_database(test_price_cents: int = 1):
         category_map[cat_name] = cat.id
 
     # 5. Seed Products and Variants
-    print(f"\n[4/5] Checking / Seeding Products & Variants (Price: {format_money(test_price_cents)})...")
+    print("\n[4/5] Checking / Seeding Products & Variants (Prices: $0.01 - $0.03)...")
     products_added = 0
     variants_added = 0
     variants_updated = 0
@@ -150,13 +152,14 @@ def seed_database(test_price_cents: int = 1):
         sku = f"SKU-{item['id']:04d}-DEF"
         variant = ProductVariant.query.filter_by(sku=sku).first()
         stock_qty = max(20, int(item.get('stock', 20)))
+        item_price_cents = test_price_cents if test_price_cents is not None else random.randint(1, 3)
 
         if not variant:
             variant = ProductVariant(
                 product_id=prod.id,
                 sku=sku,
                 spec_name="Default",
-                price_cents=test_price_cents,
+                price_cents=item_price_cents,
                 cost_price_cents=1,
                 stock=stock_qty,
                 low_stock_threshold=5,
@@ -165,19 +168,21 @@ def seed_database(test_price_cents: int = 1):
             db.session.add(variant)
             variants_added += 1
         else:
-            # Update existing variant price to 1 cent
-            if variant.price_cents != test_price_cents or variant.stock <= 0:
-                variant.price_cents = test_price_cents
+            # Update existing variant price to random 1-3 cents if not set
+            target_price = test_price_cents if test_price_cents is not None else (variant.price_cents if variant.price_cents in (1, 2, 3) else random.randint(1, 3))
+            if variant.price_cents != target_price or variant.stock <= 0:
+                variant.price_cents = target_price
                 if variant.stock <= 0:
                     variant.stock = stock_qty
                 variant.is_active = True
                 variants_updated += 1
 
-    # Update any other existing variants to 1 cent
+    # Update any other existing variants to random 1-3 cents
     all_variants = ProductVariant.query.all()
     for v in all_variants:
-        if v.price_cents != test_price_cents:
-            v.price_cents = test_price_cents
+        target_v_price = test_price_cents if test_price_cents is not None else (v.price_cents if v.price_cents in (1, 2, 3) else random.randint(1, 3))
+        if v.price_cents != target_v_price:
+            v.price_cents = target_v_price
             variants_updated += 1
         if v.stock <= 0:
             v.stock = 25

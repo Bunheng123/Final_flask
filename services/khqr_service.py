@@ -19,15 +19,40 @@ except ImportError:
 
 
 def get_khqr_config():
-    """Read and return current Bakong KHQR configuration from environment / .env file."""
+    """Read and return current Bakong KHQR configuration strictly from .env file / environment."""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except Exception:
+        pass
+
+    account_id = os.environ.get('BAKONG_ACCOUNT_ID', '').strip()
+    token = os.environ.get('BAKONG_TOKEN', '').strip()
+    merchant_name = os.environ.get('BAKONG_MERCHANT_NAME', '').strip()
+    merchant_city = os.environ.get('BAKONG_MERCHANT_CITY', '').strip()
+    currency = os.environ.get('BAKONG_CURRENCY', '').strip()
+    phone_number = os.environ.get('BAKONG_PHONE_NUMBER', '').strip()
+    store_label = os.environ.get('BAKONG_STORE_LABEL', '').strip()
+    terminal_label = os.environ.get('BAKONG_TERMINAL_LABEL', '').strip()
+
+    if has_app_context():
+        from flask import current_app
+        if account_id:
+            current_app.config['BAKONG_ACCOUNT_ID'] = account_id
+        if token:
+            current_app.config['BAKONG_TOKEN'] = token
+        if currency:
+            current_app.config['BAKONG_CURRENCY'] = currency
+
     return {
-        'token': os.environ.get('BAKONG_TOKEN', '').strip(),
-        'account_id': os.environ.get('BAKONG_ACCOUNT_ID', 'bunheng_lim@bkrt').strip(),
-        'merchant_name': os.environ.get('BAKONG_MERCHANT_NAME', 'SETEC').strip(),
-        'merchant_city': os.environ.get('BAKONG_MERCHANT_CITY', 'Phnom Penh').strip(),
-        'phone_number': os.environ.get('BAKONG_PHONE_NUMBER', '099774967').strip(),
-        'store_label': os.environ.get('BAKONG_STORE_LABEL', 'Cashier-01').strip(),
-        'terminal_label': os.environ.get('BAKONG_TERMINAL_LABEL', 'POS-01').strip(),
+        'token': token or (current_app.config.get('BAKONG_TOKEN', '') if has_app_context() else ''),
+        'account_id': account_id or (current_app.config.get('BAKONG_ACCOUNT_ID', '') if has_app_context() else ''),
+        'merchant_name': merchant_name or (current_app.config.get('BAKONG_MERCHANT_NAME', 'TechStore') if has_app_context() else 'TechStore'),
+        'merchant_city': merchant_city or (current_app.config.get('BAKONG_MERCHANT_CITY', 'Phnom Penh') if has_app_context() else 'Phnom Penh'),
+        'currency': currency or (current_app.config.get('BAKONG_CURRENCY', 'KHR') if has_app_context() else 'KHR'),
+        'phone_number': phone_number or (current_app.config.get('BAKONG_PHONE_NUMBER', '') if has_app_context() else ''),
+        'store_label': store_label or (current_app.config.get('BAKONG_STORE_LABEL', 'Cashier-01') if has_app_context() else 'Cashier-01'),
+        'terminal_label': terminal_label or (current_app.config.get('BAKONG_TERMINAL_LABEL', 'POS-01') if has_app_context() else 'POS-01'),
     }
 
 
@@ -48,7 +73,7 @@ def _make_reference(order_number=None):
 
 
 def validate_khr_tag54(amount_khr):
-    """KHQR Tag 54 requires a whole number in KHR."""
+    """KHQR Tag 54 requires a whole number in KHR without artificial modification."""
     amount = normalize_khr(amount_khr)
     if amount < 0:
         raise ValueError('Tag 54 amount cannot be negative.')
@@ -113,19 +138,26 @@ def generate_khqr(
     if client is None:
         raise RuntimeError('The bakong-khqr package is required to generate payment codes.')
 
+    currency = config.get('currency', 'KHR')
+    if currency == 'USD':
+        from helpers.currency import usd_from_khr
+        send_amount = float(usd_from_khr(amount))
+    else:
+        send_amount = float(amount)
+
     try:
         khqr_resp = client.create_qr(
-            amount=float(amount),
+            amount=send_amount,
             account_id=acc_id,
             merchant_name=name,
             merchant_city=city,
-            currency='KHR',
+            currency=currency,
             store_label=store,
             phone_number=phone,
             bill_number=exact_reference[:25],
             terminal_label=term,
             static=False,
-            expiration=1,
+            expiration=30,
             return_dict=True,
         )
     except Exception as exc:
@@ -161,7 +193,7 @@ def generate_khqr(
         'reference': exact_reference,
         'reference_md5': reference_md5,
         'amount_khr': amount,
-        'currency': 'KHR',
+        'currency': currency,
         'merchant_name': name,
         'merchant_id': acc_id,
         'expires_at': expires_at.strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -218,12 +250,19 @@ def get_payment_status(reference_md5):
         _PAYMENT_CACHE[reference_md5] = payment
 
     if payment['status'] == 'pending':
+        # Protect Bakong API daily quota (100 req/day): enforce a 4-second cooldown per reference
+        last_checked = payment.get('_last_checked_at')
+        now_ts = datetime.now(timezone.utc).timestamp()
+        if last_checked and (now_ts - last_checked) < 4:
+            return {'success': True, 'data': payment}
+
         if not get_khqr_config()['token']:
             raise RuntimeError('BAKONG_TOKEN is required to check payment status.')
         try:
             client = get_khqr_client()
             if client is None:
                 raise RuntimeError('The bakong-khqr package is required to check payment status.')
+            payment['_last_checked_at'] = now_ts
             bakong_status = client.check_payment(reference_md5)
         except Exception as exc:
             raise RuntimeError('Bakong payment status check failed.') from exc

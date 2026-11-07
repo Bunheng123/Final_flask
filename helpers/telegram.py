@@ -77,11 +77,18 @@ def send_order_receipt(order):
     """
     Builds and dispatches a comprehensive, luxury HTML order receipt to Telegram.
     Includes customer snapshot, payment method, itemized line items table, and totals.
+    Dispatched ONLY if order is confirmed and paid.
     """
     if not order:
         return
 
+    # Never alert Telegram for unpaid or pending orders
+    payment_status = getattr(order, 'payment_status', None)
+    if payment_status != 'paid':
+        return
+
     from helpers.money import format_money
+    from helpers.currency import khr_format
 
     items_text = ""
     for item in order.items:
@@ -96,25 +103,34 @@ def send_order_receipt(order):
     if order.discount_cents and order.discount_cents > 0:
         discount_line = f"🎟️ <b>Discount:</b> -{format_money(order.discount_cents)}\n"
 
-    khr_amount = f"៛{(order.total_cents / 100 * 4000):,.0f}"
+    total_khr_val = getattr(order, 'total_khr', None) or int(order.total_cents / 100 * 4100)
+    khr_amount = khr_format(total_khr_val)
+
+    wallet_line = ""
+    wallet_used = getattr(order, 'wallet_used_khr', 0) or 0
+    if wallet_used > 0:
+        wallet_line = f"👛 <b>Wallet Used:</b> {khr_format(wallet_used)}\n"
+
+    payment_method = getattr(order, 'payment_method', 'KHQR') or 'KHQR'
 
     receipt = (
-        f"🧾 <b>[NEW ORDER RECEIPT #{_escape_html(order.order_number)}]</b>\n"
+        f"✅ <b>[PAID ORDER RECEIPT #{_escape_html(order.order_number)}]</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Customer:</b> {_escape_html(order.customer_name)}\n"
         f"📞 <b>Phone:</b> {_escape_html(order.phone)}\n"
         f"✉️ <b>Email:</b> {_escape_html(order.email)}\n"
         f"📍 <b>Address:</b> {_escape_html(order.address)}\n"
-        f"💳 <b>Payment:</b> <code>{_escape_html(order.payment_method.upper())}</code>\n"
+        f"💳 <b>Payment:</b> <code>{_escape_html(payment_method.upper())}</code> (PAID)\n"
+        f"{wallet_line}"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🛒 <b>Ordered Items:</b>\n{items_text}"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💵 <b>Subtotal:</b> {format_money(order.subtotal_cents)}\n"
         f"{discount_line}"
         f"🚚 <b>Shipping:</b> Free\n"
-        f"💰 <b>Total Due:</b> <b>{format_money(order.total_cents)}</b> ({khr_amount})\n"
+        f"💰 <b>Total Paid:</b> <b>{format_money(order.total_cents)}</b> ({khr_amount})\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📌 <b>Status:</b> <b>PENDING</b> (4h cancellation window active)"
+        f"📌 <b>Status:</b> <b>PAID & CONFIRMED</b>"
     )
 
     send_telegram(receipt)

@@ -209,6 +209,14 @@ def complete_payment(payment_reference):
     )
     if updated.rowcount != 1:
         raise RuntimeError('Order payment state changed during KHQR settlement.')
+
+    # Dispatch Telegram alert ONLY for confirmed paid orders
+    try:
+        from helpers.telegram import send_order_receipt
+        db.session.refresh(order)
+        send_order_receipt(order)
+    except Exception:
+        pass
     return True
 
 

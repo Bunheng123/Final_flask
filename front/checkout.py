@@ -17,7 +17,7 @@ from helpers.auth import current_user, login_required
 from helpers.currency import khr_format, khr_from_usd, usd_format
 from helpers.money import from_cents, to_cents
 from helpers.telegram import send_telegram
-from product import get_product_by_id
+from front.cart import _resolve_product
 from services.khqr_service import generate_khqr
 from services.order_service import create_order, new_order_number
 from services.wallet_service import compute_split_payment
@@ -26,7 +26,7 @@ from services.wallet_service import compute_split_payment
 def _checkout_cart_items():
     cart_items = []
     for item in _read_cart_cookie():
-        product = get_product_by_id(item['id'])
+        product = _resolve_product(item['id'], item.get('variant_id'))
         if not product:
             continue
         item.update({
@@ -53,16 +53,20 @@ def _customer_defaults():
     }
 
 
-def _render_checkout(cart_items, error=None):
+def _render_checkout(cart_items, error=None, coupon_code=None, discount_cents=0):
     subtotal_cents = sum(to_cents(item['price']) * item['qty'] for item in cart_items)
     subtotal = from_cents(subtotal_cents)
     shipping = 0
-    total = from_cents(subtotal_cents + to_cents(shipping))
+    total_cents = max(0, subtotal_cents + to_cents(shipping) - discount_cents)
+    total = from_cents(total_cents)
     user = current_user()
     return render_template(
         'front/checkout.html',
         cart_items=cart_items,
         subtotal=subtotal,
+        discount_cents=discount_cents,
+        discount=from_cents(discount_cents),
+        coupon_code=coupon_code,
         shipping=shipping,
         total=total,
         total_khr=khr_from_usd(total),
@@ -120,7 +124,22 @@ def do_checkout():
 
     subtotal_cents = sum(to_cents(item['price']) * item['qty'] for item in cart_before)
     subtotal = from_cents(subtotal_cents)
-    total_khr = khr_from_usd(subtotal)
+
+    coupon_code = (request.form.get('coupon_code') or request.form.get('coupon_input') or '').strip().upper()
+    discount_cents = 0
+    if coupon_code:
+        from services.coupon_service import validate_coupon
+        valid, msg, calculated_discount = validate_coupon(
+            coupon_code, subtotal_cents, user_id=user.id if user else None
+        )
+        if valid:
+            discount_cents = calculated_discount
+        else:
+            coupon_code = None
+
+    total_cents = max(0, subtotal_cents - discount_cents)
+    total = from_cents(total_cents)
+    total_khr = khr_from_usd(total)
     wallet_balance_khr = getattr(user, 'wallet_balance_khr', 0) if user else 0
     if payment_method == 'wallet':
         if wallet_balance_khr < total_khr:
@@ -180,6 +199,7 @@ def do_checkout():
             total_khr=total_khr,
             wallet_used_khr=payment_result['wallet_used_khr'],
             order_number=order_number,
+            coupon_code=coupon_code,
         )
         db.session.commit()
     except ValueError as exc:
@@ -189,19 +209,6 @@ def do_checkout():
         db.session.rollback()
         current_app.logger.exception('Unable to place customer checkout order.')
         return _render_checkout(cart_before, 'We could not place your order. Please try again.'), 500
-
-    message = (
-        f"<b>New Order #{html.escape(order.order_number)}</b>\n"
-        f"<b>Customer:</b> {html.escape(order.customer_name)}\n"
-        f"<b>Address:</b> {html.escape(order.address)}\n"
-        f"<b>Phone:</b> {html.escape(order.phone)}\n"
-        f"<b>Email:</b> {html.escape(order.email)}\n"
-        f"<b>Payment:</b> {html.escape(order.payment_method.upper())}\n"
-        f"<b>Wallet:</b> {payment_result['wallet_used_khr']} KHR\n"
-        f"<b>KHQR:</b> {external_amount_khr} KHR\n"
-        f"<b>Total:</b> ${subtotal:.2f} ({khr_format(total_khr)})\n"
-    )
-    send_telegram(message)
 
     base64_uri = khqr_payment.get('base64_uri') if khqr_payment else None
     response = make_response(render_template(
@@ -213,8 +220,11 @@ def do_checkout():
         order_info=order_info,
         cart_items=cart_before,
         subtotal=subtotal,
+        discount_cents=discount_cents,
+        discount=from_cents(discount_cents),
+        coupon_code=coupon_code,
         shipping=0,
-        total=subtotal,
+        total=total,
         total_khr=total_khr,
         wallet_balance_khr=getattr(user, 'wallet_balance_khr', 0) if user else 0,
         is_authenticated=bool(user),
@@ -224,6 +234,10 @@ def do_checkout():
         qr_image_base64=base64_uri,
         payment_check_url=(
             url_for('api_bp.payment_check', payment_hash=payment_reference)
+            if payment_reference else None
+        ),
+        payment_cancel_url=(
+            url_for('api_bp.payment_cancel', payment_hash=payment_reference)
             if payment_reference else None
         ),
         checkout_url=url_for('front_bp.checkout'),

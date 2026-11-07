@@ -72,3 +72,25 @@ def api_payment_check(payment_hash):
             }), 503
 
     return jsonify(status)
+
+
+@api_bp.post('/payment/cancel/<string:payment_hash>', endpoint='payment_cancel')
+def api_payment_cancel(payment_hash):
+    """Cancel an unpaid KHQR order, restore stock, and release any reserved wallet funds."""
+    from services.order_service import cancel_order
+    try:
+        order = Order.query.filter_by(payment_reference=payment_hash, payment_status='pending').first()
+        if order:
+            try:
+                cancel_order(order.id, reason="Customer cancelled payment")
+            except Exception:
+                expire_payment(payment_hash)
+        else:
+            expire_payment(payment_hash)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Payment cancelled successfully.'})
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Unable to cancel payment reference %s.', payment_hash)
+        return jsonify({'success': False, 'message': 'Unable to cancel payment.'}), 500
+

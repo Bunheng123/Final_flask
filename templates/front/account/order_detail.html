@@ -50,49 +50,82 @@
         {% endif %}
       {% endwith %}
 
-      <!-- KHQR Real-time Status Polling -->
-      {% if payment_check_url and order.payment_status in ['pending', 'cancelled'] %}
+      <!-- KHQR Status Verification (On-Demand to protect 100 req/day quota) -->
+      {% if payment_check_url and order.payment_status == 'pending' %}
         <div id="order-payment-status" data-payment-check-url="{{ payment_check_url }}"
-          class="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 flex items-center justify-between">
+          class="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-lg shadow-amber-500/5">
           <div class="flex items-center gap-3">
-            <svg class="animate-spin h-5 w-5 text-amber-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <span id="order-payment-status-text">Checking KHQR payment status in real-time...</span>
+            <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <p class="font-bold text-white text-sm">Awaiting KHQR Payment</p>
+              <p id="order-payment-status-text" class="text-slate-300 mt-0.5">If you have completed payment in your banking app, click below to verify.</p>
+            </div>
           </div>
+          <button id="verify-order-status-btn" type="button"
+            class="shrink-0 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 cursor-pointer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="verify-order-btn-text">Verify Payment Status</span>
+          </button>
         </div>
         <script>
           (function () {
             const panel = document.getElementById('order-payment-status');
             const statusText = document.getElementById('order-payment-status-text');
-            const checkUrl = panel.dataset.paymentCheckUrl;
+            const verifyBtn = document.getElementById('verify-order-status-btn');
+            const verifyBtnText = document.getElementById('verify-order-btn-text');
+            const checkUrl = panel?.dataset.paymentCheckUrl;
+            if (!checkUrl) return;
+
             let checking = false;
-            let timer;
+            let cooldownTimer = null;
+
+            function startCooldown(seconds) {
+              if (!verifyBtn) return;
+              verifyBtn.disabled = true;
+              verifyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+              let remaining = seconds;
+              if (verifyBtnText) verifyBtnText.textContent = `Please wait (${remaining}s)...`;
+              if (cooldownTimer) clearInterval(cooldownTimer);
+              cooldownTimer = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                  clearInterval(cooldownTimer);
+                  cooldownTimer = null;
+                  verifyBtn.disabled = false;
+                  verifyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                  if (verifyBtnText) verifyBtnText.textContent = 'Verify Payment Status';
+                } else {
+                  if (verifyBtnText) verifyBtnText.textContent = `Please wait (${remaining}s)...`;
+                }
+              }, 1000);
+            }
+
             async function checkPayment() {
               if (checking) return;
               checking = true;
+              startCooldown(5);
+              if (statusText) statusText.textContent = 'Verifying with Bakong Open API...';
               try {
                 const response = await fetch(checkUrl, { cache: 'no-store', headers: { Accept: 'application/json' } });
                 const result = await response.json();
                 if (response.ok && result.success && result.data.status === 'paid') {
-                  window.clearInterval(timer);
-                  statusText.textContent = 'KHQR payment confirmed! Updating order status...';
-                  window.location.reload();
+                  if (statusText) statusText.textContent = 'KHQR payment confirmed! Updating order status...';
+                  window.setTimeout(() => window.location.reload(), 800);
                 } else if (response.ok && result.success && result.data.status === 'expired') {
-                  window.clearInterval(timer);
-                  statusText.textContent = 'KHQR payment expired. Any reserved wallet funds have been returned.';
+                  if (statusText) statusText.textContent = 'KHQR payment expired. Any reserved wallet funds have been returned.';
                 } else {
-                  statusText.textContent = 'Awaiting KHQR payment confirmation...';
+                  if (statusText) statusText.textContent = 'Payment not detected yet. If you have already paid, please wait a moment and try again.';
                 }
               } catch (error) {
-                statusText.textContent = 'Payment status check momentarily unavailable.';
+                if (statusText) statusText.textContent = 'Payment status check momentarily unavailable. Please retry.';
               } finally {
                 checking = false;
               }
             }
-            checkPayment();
-            timer = window.setInterval(checkPayment, 4000);
+
+            verifyBtn?.addEventListener('click', checkPayment);
           })();
         </script>
       {% endif %}

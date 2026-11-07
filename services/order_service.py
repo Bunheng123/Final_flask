@@ -252,14 +252,17 @@ def create_order(
 
     # Validate coupon if present
     discount_cents = 0
-    if coupon_code:
+    clean_coupon_code = coupon_code.strip().upper() if coupon_code else None
+    if clean_coupon_code:
         try:
-            from services.coupon_service import validate_coupon, redeem_coupon
-            valid, discount_amount, err = validate_coupon(coupon_code, subtotal_cents, user_id=user_id)
+            from services.coupon_service import validate_coupon
+            valid, msg, calculated_discount = validate_coupon(clean_coupon_code, subtotal_cents, user_id=user_id)
             if valid:
-                discount_cents = discount_amount
+                discount_cents = calculated_discount
+            else:
+                clean_coupon_code = None
         except Exception:
-            pass
+            clean_coupon_code = None
 
     total_cents = max(0, subtotal_cents - discount_cents)
 
@@ -279,7 +282,7 @@ def create_order(
         total_cents=total_cents,
         total_khr=int(total_khr),
         wallet_used_khr=int(wallet_used_khr),
-        coupon_code=coupon_code,
+        coupon_code=clean_coupon_code,
         created_at=utc_now(),
         paid_at=utc_now() if payment_status == 'paid' else None
     )
@@ -313,6 +316,13 @@ def create_order(
                 order.id,
                 pending_payment=payment_status == 'pending',
             )
+        except Exception:
+            pass
+
+    if clean_coupon_code and discount_cents > 0:
+        try:
+            from services.coupon_service import redeem
+            redeem(clean_coupon_code, order.id, user_id=user_id)
         except Exception:
             pass
 
@@ -406,7 +416,7 @@ def _release_order_coupon(order: Order):
         return
     try:
         from services.coupon_service import release_coupon
-        release_coupon(order.coupon_code)
+        release_coupon(order.coupon_code, order.id)
     except Exception:
         pass
 

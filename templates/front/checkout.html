@@ -58,7 +58,7 @@
         {% if base64_uri and (order_info.payment in ['qr', 'khqr', 'split'] or (payment_result and payment_result.payment_mode in ['qr', 'khqr', 'split'])) %}
           <div id="khqr-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
             role="dialog" aria-modal="true" aria-labelledby="khqr-modal-title">
-            <div id="khqr-payment-panel" data-payment-check-url="{{ payment_check_url }}" data-checkout-url="{{ checkout_url }}"
+            <div id="khqr-payment-panel" data-payment-check-url="{{ payment_check_url }}" data-payment-cancel-url="{{ payment_cancel_url }}" data-checkout-url="{{ checkout_url }}"
               class="w-full max-w-4xl rounded-3xl border border-indigo-500/30 bg-slate-800 p-6 text-center shadow-2xl sm:p-8">
               <div id="payment-pending-content">
                 <div class="flex items-center justify-between gap-4">
@@ -73,15 +73,28 @@
                 </p>
 
                 <div class="rounded-2xl bg-slate-950 p-6">
-                  <img src="{{ base64_uri }}" alt="Bakong KHQR Payment Code" class="mx-auto h-64 w-64 rounded-2xl bg-white object-contain p-4" />
+                  <img src="{{ base64_uri }}" alt="Bakong KHQR Payment Code" class="mx-auto h-64 w-64 rounded-2xl bg-white object-contain p-4 shadow-xl" />
                   <div class="mt-5 space-y-1">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Total to pay</p>
                     <p class="text-3xl font-extrabold text-indigo-300">{{ khr_format(payment_result.khqr_remaining_khr if payment_result else total_khr) }}</p>
                     <p class="text-xs text-slate-400">{{ usd_format(payment_result.khqr_remaining_khr if payment_result else total_khr) }}</p>
                   </div>
-                  <div class="mt-5 flex items-center justify-center gap-2 text-xs text-slate-400">
-                    <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
-                    <span id="payment-status-message">Waiting for payment confirmation...</span>
+                  <div class="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
+                    <span id="payment-status-dot" class="h-2 w-2 rounded-full bg-amber-400"></span>
+                    <span id="payment-status-message">Scan with your mobile banking app, then click below to verify.</span>
+                  </div>
+
+                  <!-- Explicit Action Buttons (Conserves Bakong 100 req/day quota) -->
+                  <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <button id="verify-payment-btn" type="button"
+                      class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      <span id="verify-btn-text">I Have Paid — Verify Order</span>
+                    </button>
+                    <button id="cancel-payment-modal-btn" type="button"
+                      class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm border border-slate-700 transition cursor-pointer">
+                      Cancel Order
+                    </button>
                   </div>
                 </div>
               </div>
@@ -232,7 +245,7 @@
                 Available balance: {{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}. The order total must be covered by your wallet.
               </p>
               <a href="{{ url_for('front_bp.account_wallet') }}" class="mt-2 inline-block text-sm text-indigo-300 hover:underline">
-                Add wallet funds
+                View refund wallet balance
               </a>
             </div>
             <div id="panel-split" class="hidden p-4 rounded-3xl bg-slate-800 border border-indigo-500/30">
@@ -285,15 +298,28 @@
       </div>
 
       <!-- Coupon Box Partial -->
+      {% if not order_placed %}
       <div class="mb-6">
         {% include 'front/partials/_coupon_box.html' ignore missing %}
       </div>
+      {% endif %}
 
       <div class="space-y-4 mb-6">
         <div class="flex justify-between text-slate-400">
           <span>Subtotal</span>
           <span>${{ "%.2f"|format(subtotal if subtotal is defined else 0) }}</span>
         </div>
+        {% if discount_cents is defined and discount_cents > 0 %}
+        <div class="flex justify-between text-emerald-400 font-medium text-sm">
+          <span>Coupon Discount ({{ coupon_code }})</span>
+          <span>-${{ "%.2f"|format(discount if discount is defined else (discount_cents / 100)) }}</span>
+        </div>
+        {% elif order is defined and order.discount_cents and order.discount_cents > 0 %}
+        <div class="flex justify-between text-emerald-400 font-medium text-sm">
+          <span>Coupon Discount ({{ order.coupon_code }})</span>
+          <span>-${{ "%.2f"|format(order.discount_cents / 100) }}</span>
+        </div>
+        {% endif %}
         <div class="flex justify-between text-slate-400">
           <span>Shipping</span>
           <span>{{ "Free" if shipping == 0 else "$%.2f"|format(shipping) }}</span>
@@ -369,25 +395,72 @@
       const description = document.getElementById('order-status-description');
       const modal = document.getElementById('khqr-modal');
       const cancelButton = document.getElementById('cancel-khqr-payment');
+      const cancelModalButton = document.getElementById('cancel-payment-modal-btn');
+      const verifyButton = document.getElementById('verify-payment-btn');
+      const verifyBtnText = document.getElementById('verify-btn-text');
       const checkoutUrl = paymentPanel.dataset.checkoutUrl;
       const banner = document.getElementById('order-status-banner');
       const icon = document.getElementById('order-status-icon');
       const statusMessage = document.getElementById('payment-status-message');
+      const statusDot = document.getElementById('payment-status-dot');
       const pendingContent = document.getElementById('payment-pending-content');
       const successMessage = document.getElementById('payment-success-message');
+      const cancelUrl = paymentPanel.dataset.paymentCancelUrl;
       let checking = false;
       let returningToCheckout = false;
-      let timer;
+      let cooldownTimer = null;
 
-      cancelButton?.addEventListener('click', () => {
+      async function handleCancel() {
+        if (returningToCheckout) return;
         returningToCheckout = true;
-        window.clearInterval(timer);
+        if (cancelButton) {
+          cancelButton.disabled = true;
+          cancelButton.textContent = 'Cancelling...';
+        }
+        if (cancelModalButton) {
+          cancelModalButton.disabled = true;
+          cancelModalButton.textContent = 'Cancelling...';
+        }
+        if (cancelUrl) {
+          try {
+            await fetch(cancelUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+          } catch (e) {}
+        }
         window.location.assign(checkoutUrl);
-      });
+      }
+
+      cancelButton?.addEventListener('click', handleCancel);
+      cancelModalButton?.addEventListener('click', handleCancel);
+
+      function startCooldown(seconds) {
+        if (!verifyButton) return;
+        verifyButton.disabled = true;
+        verifyButton.classList.add('opacity-50', 'cursor-not-allowed');
+        let remaining = seconds;
+        if (verifyBtnText) verifyBtnText.textContent = `Please wait (${remaining}s)...`;
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        cooldownTimer = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(cooldownTimer);
+            cooldownTimer = null;
+            verifyButton.disabled = false;
+            verifyButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            if (verifyBtnText) verifyBtnText.textContent = 'I Have Paid — Verify Order';
+          } else {
+            if (verifyBtnText) verifyBtnText.textContent = `Please wait (${remaining}s)...`;
+          }
+        }, 1000);
+      }
 
       async function checkPayment() {
-        if (checking) return;
+        if (checking || returningToCheckout) return;
         checking = true;
+        startCooldown(5);
+        if (statusMessage) statusMessage.textContent = 'Verifying with Bakong Open API...';
+        if (statusDot) {
+          statusDot.className = 'h-2 w-2 rounded-full bg-cyan-400 animate-ping';
+        }
         try {
           const response = await fetch(checkUrl, {
             cache: 'no-store',
@@ -397,42 +470,53 @@
           if (returningToCheckout) return;
 
           if (response.status === 503) {
-            statusMessage.textContent = 'Payment status check is temporarily unavailable. Retrying...';
+            if (statusMessage) statusMessage.textContent = 'Payment gateway busy. Please wait a moment and try again.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';
             return;
           }
           if (!response.ok || !result.success) {
-            statusMessage.textContent = 'Unable to find this payment. Please contact the store for help.';
-            window.clearInterval(timer);
+            if (statusMessage) statusMessage.textContent = 'Verification check momentarily unavailable. Please retry.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-rose-400';
             return;
           }
 
           if (result.data.status === 'paid') {
-            window.clearInterval(timer);
             document.cookie = 'cart_list=; Max-Age=0; Path=/; SameSite=Lax';
-            pendingContent.classList.add('hidden');
-            successMessage.classList.remove('hidden');
-            banner.classList.replace('bg-amber-500/10', 'bg-emerald-500/10');
-            banner.classList.replace('border-amber-500/20', 'border-emerald-500/20');
-            banner.classList.replace('text-amber-200', 'text-emerald-200');
-            icon.classList.replace('bg-amber-500/20', 'bg-emerald-500/20');
-            icon.classList.replace('text-amber-400', 'text-emerald-400');
-            icon.classList.replace('border-amber-500/30', 'border-emerald-500/30');
-            title.textContent = 'Order placed successfully!';
-            description.textContent = 'Payment received and confirmed.';
-            window.setTimeout(() => modal.classList.add('hidden'), 1800);
+            if (statusMessage) statusMessage.textContent = 'Payment confirmed! Finalizing your order...';
+            if (pendingContent) pendingContent.classList.add('hidden');
+            if (successMessage) successMessage.classList.remove('hidden');
+            if (banner) {
+              banner.classList.replace('bg-amber-500/10', 'bg-emerald-500/10');
+              banner.classList.replace('border-amber-500/20', 'border-emerald-500/20');
+              banner.classList.replace('text-amber-200', 'text-emerald-200');
+            }
+            if (icon) {
+              icon.classList.replace('bg-amber-500/20', 'bg-emerald-500/20');
+              icon.classList.replace('text-amber-400', 'text-emerald-400');
+              icon.classList.replace('border-amber-500/30', 'border-emerald-500/30');
+            }
+            if (title) title.textContent = 'Order placed successfully!';
+            if (description) description.textContent = 'Payment received and confirmed.';
+            window.setTimeout(() => { if (modal) modal.classList.add('hidden'); }, 1800);
+          } else if (result.data.bakong_status === 'SCANNED') {
+            if (statusMessage) statusMessage.textContent = '📱 QR code scanned! Confirming with bank... click Verify once approved.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-indigo-400';
           } else if (result.data.status === 'expired') {
-            window.clearInterval(timer);
-            statusMessage.textContent = 'This payment QR has expired. Please contact the store for assistance.';
+            if (statusMessage) statusMessage.textContent = 'This payment QR has expired. Please cancel and place a new order.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-rose-500';
+          } else {
+            if (statusMessage) statusMessage.textContent = 'Payment not detected yet. If you have already paid in your app, please wait 3-5 seconds and click Verify again.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';
           }
         } catch (error) {
-          statusMessage.textContent = 'Payment status check is temporarily unavailable. Retrying...';
+          if (statusMessage) statusMessage.textContent = 'Connection error checking payment. Please try again.';
+          if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-rose-400';
         } finally {
           checking = false;
         }
       }
 
-      checkPayment();
-      timer = window.setInterval(checkPayment, 5000);
+      verifyButton?.addEventListener('click', checkPayment);
     })();
   </script>
 </body>

@@ -137,3 +137,28 @@ def release(redemption_id: int) -> bool:
     db.session.delete(redemption)
     db.session.commit()
     return True
+
+
+def release_coupon(coupon_code: str, order_id: Optional[int] = None) -> bool:
+    """
+    Releases a redeemed coupon by coupon code and optional order_id.
+    """
+    clean_code = (coupon_code or '').strip().upper()
+    coupon = Coupon.query.filter(func.upper(Coupon.code) == clean_code).first()
+    if not coupon:
+        return False
+    query = CouponRedemption.query.filter_by(coupon_id=coupon.id)
+    if order_id:
+        query = query.filter_by(order_id=order_id)
+    redemption = query.order_by(CouponRedemption.id.desc()).first()
+    if redemption:
+        return release(redemption.id)
+    elif coupon.used_count and coupon.used_count > 0:
+        coupon.used_count -= 1
+        db.session.commit()
+        return True
+    return False
+
+
+# Aliases for cross-module compatibility
+redeem_coupon = redeem
