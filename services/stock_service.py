@@ -77,28 +77,78 @@ def _get_fallback_low_stock_threshold() -> int:
         return 5
 
 
+def _get_alert_telegram_credentials():
+    """
+    Retrieve Telegram credentials targeting the 429 security alert chat
+    (TELEGRAM_ALERT_CHAT_ID / @pp_shop_alert and TELEGRAM_ALERT_BOT_TOKEN).
+    Never defaults to the customer order chat (@SETEC_PP_SHOP).
+    """
+    chat_id = None
+    bot_token = None
+    try:
+        if current_app:
+            cfg = current_app.config
+            chat_id = cfg.get("TELEGRAM_ALERT_CHAT_ID")
+            bot_token = cfg.get("TELEGRAM_ALERT_BOT_TOKEN") or cfg.get("TELEGRAM_BOT_TOKEN")
+    except Exception:
+        pass
+
+    if not chat_id:
+        try:
+            from config import TELEGRAM_ALERT_CHAT_ID
+            chat_id = TELEGRAM_ALERT_CHAT_ID
+        except Exception:
+            chat_id = None
+
+    if not chat_id:
+        chat_id = "@pp_shop_alert"
+
+    if not bot_token:
+        try:
+            from config import TELEGRAM_ALERT_BOT_TOKEN, TELEGRAM_BOT_TOKEN
+            bot_token = TELEGRAM_ALERT_BOT_TOKEN or TELEGRAM_BOT_TOKEN
+        except Exception:
+            bot_token = ""
+
+    return chat_id, bot_token
+
+
 def _notify_low_stock(variant: ProductVariant, threshold: int) -> None:
     """
-    Dispatch a low-stock alert asynchronously via Telegram.
+    Dispatch a low-stock alert asynchronously via Telegram to the 429 security alert chat.
+    Includes formatted warning card: Product Name, Spec, SKU, Remaining Stock, Threshold, Restock Link.
     Never raises an exception into the caller.
     """
     try:
-        product_name = variant.product.name if variant.product else "Unknown Product"
-        variant_desc = f"{product_name} - {variant.spec_name} (SKU: {variant.sku})"
-        thresh_info = f" (Threshold: {threshold})" if threshold is not None else ""
+        product_id = variant.product_id if variant else ""
+        product_name = variant.product.name if (variant and variant.product) else "Unknown Product"
+        spec_name = variant.spec_name if variant else "Default"
+        sku = variant.sku if variant else "N/A"
+        remaining_stock = variant.stock if variant else 0
+        restock_link = f"/admin/products/{product_id}/variants" if product_id else "/admin/products"
+
         msg = (
-            f"⚠️ <b>[LOW STOCK ALERT]</b>\n"
-            f"Product/Variant: <b>{_escape_html(variant_desc)}</b>\n"
-            f"Current Stock: <b>{variant.stock}</b>{thresh_info}\n"
-            f"Please reorder inventory soon."
+            "⚠️ <b>[LOW STOCK ALERT]</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Product: <b>{_escape_html(product_name)}</b>\n"
+            f"Spec: <b>{_escape_html(spec_name)}</b>\n"
+            f"SKU: <code>{_escape_html(sku)}</code>\n"
+            f"Remaining Stock: <b>{remaining_stock}</b>\n"
+            f"Threshold Trigger: <b>{threshold}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔗 Restock Link: <code>{restock_link}</code>"
         )
+
+        chat_id, bot_token = _get_alert_telegram_credentials()
 
         mod = sys.modules.get(__name__)
         local_send = getattr(mod, 'send_telegram', None)
-        if local_send and local_send != telegram.send_telegram:
-            local_send(msg)
-        else:
-            telegram.send_telegram(msg)
+        target_fn = local_send if (local_send and local_send != telegram.send_telegram) else telegram.send_telegram
+
+        try:
+            target_fn(msg, chat_id=chat_id, token=bot_token)
+        except TypeError:
+            target_fn(msg)
     except Exception as e:
         # Non-blocking background alert; never crash caller
         print(f"[StockService] Low stock alert dispatch failed: {e}")
@@ -520,6 +570,7 @@ def delete_variant(variant_id: int) -> bool:
 def update_stock(variant_id: int, new_stock: int) -> bool:
     """
     Directly update the stock count of a variant (for admin manual adjustment).
+    Dispatches a low-stock alert if the adjusted stock is at or below threshold.
     """
     if int(new_stock) < 0:
         raise ValueError("Stock count cannot be negative.")
@@ -530,6 +581,16 @@ def update_stock(variant_id: int, new_stock: int) -> bool:
 
     variant.stock = int(new_stock)
     db.session.commit()
+    db.session.expire_all()
+
+    thresh = (
+        variant.low_stock_threshold
+        if variant.low_stock_threshold is not None
+        else _get_fallback_low_stock_threshold()
+    )
+    if variant.stock <= thresh:
+        _notify_low_stock(variant, thresh)
+
     return True
 
 

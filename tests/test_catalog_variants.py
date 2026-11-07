@@ -260,18 +260,24 @@ def test_restore_stock(app, sample_catalog):
 def test_low_stock_alert_triggered_explicit_threshold(app, sample_catalog, monkeypatch):
     """
     When stock drops to or below the variant's low_stock_threshold (2),
-    an alert must be dispatched via send_telegram.
+    an alert must be dispatched via send_telegram targeting the 429 security alert chat (@pp_shop_alert).
     """
     dispatched_alerts = []
 
-    def mock_send(msg):
-        dispatched_alerts.append(msg)
+    def mock_send(msg, chat_id=None, token=None, **kwargs):
+        dispatched_alerts.append({
+            "msg": msg,
+            "chat_id": chat_id,
+            "token": token
+        })
 
     monkeypatch.setattr('services.stock_service.send_telegram', mock_send)
     monkeypatch.setattr('helpers.telegram.send_telegram', mock_send)
 
     with app.app_context():
         var_id = sample_catalog["var1_pro_id"]  # Stock: 4, Threshold: 2
+        var = stock_service.get_variant_by_id(var_id)
+        prod_id = var.product_id
 
         # Decrement by 1 -> Stock is 3 (> 2) -> No alert
         stock_service.decrement_stock_atomic(variant_id=var_id, quantity=1)
@@ -281,20 +287,33 @@ def test_low_stock_alert_triggered_explicit_threshold(app, sample_catalog, monke
         stock_service.decrement_stock_atomic(variant_id=var_id, quantity=1)
         assert len(dispatched_alerts) == 1
         alert = dispatched_alerts[0]
-        assert "LOW STOCK ALERT" in alert
-        assert "TP-X1-PRO" in alert
-        assert "Current Stock: <b>2</b>" in alert
-        assert "Threshold: 2" in alert
+        msg = alert["msg"]
+        chat_id = alert["chat_id"]
+
+        # Alert must target the 429 rate limit security alert channel (@pp_shop_alert)
+        assert chat_id == "@pp_shop_alert"
+        assert "LOW STOCK ALERT" in msg
+        assert "ThinkPad X1 Carbon" in msg
+        assert "Pro (32GB / 1TB)" in msg
+        assert "TP-X1-PRO" in msg
+        assert "Remaining Stock: <b>2</b>" in msg
+        assert "Threshold Trigger: <b>2</b>" in msg
+        assert f"/admin/products/{prod_id}/variants" in msg
 
 
 def test_low_stock_alert_triggered_fallback_threshold(app, sample_catalog, monkeypatch):
     """
-    When low_stock_threshold is None, it should use config LOW_STOCK_THRESHOLD (default 5).
+    When low_stock_threshold is None, it should use config LOW_STOCK_THRESHOLD (default 5)
+    and target the 429 security alert chat (@pp_shop_alert).
     """
     dispatched_alerts = []
 
-    def mock_send(msg):
-        dispatched_alerts.append(msg)
+    def mock_send(msg, chat_id=None, token=None, **kwargs):
+        dispatched_alerts.append({
+            "msg": msg,
+            "chat_id": chat_id,
+            "token": token
+        })
 
     monkeypatch.setattr('services.stock_service.send_telegram', mock_send)
     monkeypatch.setattr('helpers.telegram.send_telegram', mock_send)
@@ -310,9 +329,77 @@ def test_low_stock_alert_triggered_fallback_threshold(app, sample_catalog, monke
         # Decrement by 2 -> Stock: 4 (<= 5) -> Alert triggered!
         stock_service.decrement_stock_atomic(variant_id=var.id, quantity=2)
         assert len(dispatched_alerts) == 1
-        assert "IP15P-128" in dispatched_alerts[0]
-        assert "Current Stock: <b>4</b>" in dispatched_alerts[0]
-        assert "Threshold: 5" in dispatched_alerts[0]
+        alert = dispatched_alerts[0]
+        msg = alert["msg"]
+        chat_id = alert["chat_id"]
+
+        assert chat_id == "@pp_shop_alert"
+        assert "LOW STOCK ALERT" in msg
+        assert "iPhone 15 Pro" in msg
+        assert "IP15P-128" in msg
+        assert "Remaining Stock: <b>4</b>" in msg
+        assert "Threshold Trigger: <b>5</b>" in msg
+        assert f"/admin/products/{prod2.id}/variants" in msg
+
+
+def test_low_stock_alert_uses_custom_security_alert_channel(app, sample_catalog, monkeypatch):
+    """
+    Verifies that TELEGRAM_ALERT_CHAT_ID and TELEGRAM_ALERT_BOT_TOKEN
+    from app.config are respected when dispatching low stock alerts.
+    """
+    dispatched_alerts = []
+
+    def mock_send(msg, chat_id=None, token=None, **kwargs):
+        dispatched_alerts.append({
+            "msg": msg,
+            "chat_id": chat_id,
+            "token": token
+        })
+
+    monkeypatch.setattr('services.stock_service.send_telegram', mock_send)
+    monkeypatch.setattr('helpers.telegram.send_telegram', mock_send)
+
+    with app.app_context():
+        monkeypatch.setitem(app.config, "TELEGRAM_ALERT_CHAT_ID", "@custom_sec_alert")
+        monkeypatch.setitem(app.config, "TELEGRAM_ALERT_BOT_TOKEN", "custom_alert_bot_token")
+
+        var_id = sample_catalog["var1_pro_id"]  # Stock: 4, Threshold: 2
+        stock_service.decrement_stock_atomic(variant_id=var_id, quantity=2)
+
+        assert len(dispatched_alerts) == 1
+        alert = dispatched_alerts[0]
+        assert alert["chat_id"] == "@custom_sec_alert"
+        assert alert["token"] == "custom_alert_bot_token"
+        assert "Remaining Stock: <b>2</b>" in alert["msg"]
+        assert f"/admin/products/{sample_catalog['prod1_id']}/variants" in alert["msg"]
+
+
+def test_low_stock_alert_triggered_on_manual_stock_update(app, sample_catalog, monkeypatch):
+    """
+    Verifies that updating stock via update_stock() also dispatches
+    a low stock alert if the new stock is <= threshold.
+    """
+    dispatched_alerts = []
+
+    def mock_send(msg, chat_id=None, token=None, **kwargs):
+        dispatched_alerts.append({
+            "msg": msg,
+            "chat_id": chat_id,
+            "token": token
+        })
+
+    monkeypatch.setattr('services.stock_service.send_telegram', mock_send)
+    monkeypatch.setattr('helpers.telegram.send_telegram', mock_send)
+
+    with app.app_context():
+        var_id = sample_catalog["var1_pro_id"]  # threshold is 2
+        stock_service.update_stock(variant_id=var_id, new_stock=1)
+
+        assert len(dispatched_alerts) == 1
+        alert = dispatched_alerts[0]
+        assert alert["chat_id"] == "@pp_shop_alert"
+        assert "Remaining Stock: <b>1</b>" in alert["msg"]
+        assert f"/admin/products/{sample_catalog['prod1_id']}/variants" in alert["msg"]
 
 
 # ==========================================
