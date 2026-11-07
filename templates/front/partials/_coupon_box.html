@@ -1,3 +1,148 @@
-{# Owner: Workstream D / M4 (Coupons, Invoicing & Reports) #}
-<!-- Promotional Coupon Box Partial (Stub) -->
+{# Owner: Workstream D / Developer 4 (Coupons, Invoicing & Reports) #}
+<!-- Promotional Coupon Box Partial -->
+<div class="p-4 rounded-3xl bg-slate-900 border border-slate-700/80 mb-6">
+  <div class="flex items-center gap-2 mb-2">
+    <i class="bi bi-tag-fill text-indigo-400"></i>
+    <label for="coupon_input" class="text-sm font-semibold text-slate-200">Have a Promo Code?</label>
+  </div>
+  
+  <div class="flex gap-2">
+    <input
+      type="text"
+      id="coupon_input"
+      placeholder="e.g. WELCOME10"
+      class="flex-1 uppercase font-mono tracking-wider p-2.5 text-sm bg-slate-800 text-white border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
+      autocomplete="off"
+    />
+    <button
+      type="button"
+      id="apply_coupon_btn"
+      class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer"
+    >
+      Apply
+    </button>
+  </div>
 
+  <!-- Hidden input passed with the checkout form -->
+  <input type="hidden" name="coupon_code" id="applied_coupon_code" value="" />
+
+  <!-- Feedback alert box -->
+  <div id="coupon_feedback" class="hidden mt-3 p-2.5 rounded-xl text-xs font-medium flex items-center justify-between gap-2">
+    <span id="coupon_feedback_text"></span>
+    <button type="button" id="remove_coupon_btn" class="hidden text-rose-400 hover:text-rose-300 font-bold ml-auto text-xs underline cursor-pointer">
+      Remove
+    </button>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const applyBtn = document.getElementById('apply_coupon_btn');
+  const removeBtn = document.getElementById('remove_coupon_btn');
+  const couponInput = document.getElementById('coupon_input');
+  const appliedCodeInput = document.getElementById('applied_coupon_code');
+  const feedbackBox = document.getElementById('coupon_feedback');
+  const feedbackText = document.getElementById('coupon_feedback_text');
+
+  if (!applyBtn || !couponInput) return;
+
+  applyBtn.addEventListener('click', async function() {
+    const code = couponInput.value.trim();
+    if (!code) {
+      showFeedback('Please enter a coupon code.', false);
+      return;
+    }
+
+    applyBtn.disabled = true;
+    applyBtn.innerText = 'Checking...';
+
+    // Extract current subtotal from page or DOM
+    let subtotalVal = 0;
+    const subtotalEl = document.querySelector('.text-slate-400 span:last-child');
+    if (subtotalEl) {
+      const match = subtotalEl.textContent.replace(/[^0-9.]/g, '');
+      if (match) subtotalVal = parseFloat(match);
+    }
+
+    try {
+      const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+      const response = await fetch('/coupon/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+          code: code,
+          subtotal: subtotalVal
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        showFeedback(`${data.message} Saved ${data.discount_formatted}`, true);
+        appliedCodeInput.value = data.code;
+        couponInput.disabled = true;
+        applyBtn.classList.add('hidden');
+        removeBtn.classList.remove('hidden');
+
+        // Dynamically update total in UI if total elements exist
+        updateCheckoutTotal(data.new_total_formatted, data.discount_formatted);
+      } else {
+        showFeedback(data.message || 'Invalid coupon code.', false);
+        appliedCodeInput.value = '';
+      }
+    } catch (err) {
+      showFeedback('Failed to validate coupon. Please try again.', false);
+    } finally {
+      applyBtn.disabled = false;
+      applyBtn.innerText = 'Apply';
+    }
+  });
+
+  removeBtn.addEventListener('click', function() {
+    couponInput.value = '';
+    couponInput.disabled = false;
+    appliedCodeInput.value = '';
+    feedbackBox.classList.add('hidden');
+    removeBtn.classList.add('hidden');
+    applyBtn.classList.remove('hidden');
+
+    // Reset discount row if present
+    const discountRow = document.getElementById('checkout_discount_row');
+    if (discountRow) discountRow.remove();
+  });
+
+  function showFeedback(msg, isSuccess) {
+    feedbackBox.classList.remove('hidden', 'bg-emerald-500/15', 'border-emerald-500/30', 'text-emerald-300', 'bg-rose-500/15', 'border-rose-500/30', 'text-rose-300', 'border');
+    if (isSuccess) {
+      feedbackBox.classList.add('bg-emerald-500/15', 'border', 'border-emerald-500/30', 'text-emerald-300');
+    } else {
+      feedbackBox.classList.add('bg-rose-500/15', 'border', 'border-rose-500/30', 'text-rose-300');
+    }
+    feedbackText.innerText = msg;
+  }
+
+  function updateCheckoutTotal(newTotalFormatted, discountFormatted) {
+    let discountRow = document.getElementById('checkout_discount_row');
+    if (!discountRow) {
+      const summaryContainer = document.querySelector('.space-y-4.mb-6:last-of-type');
+      if (summaryContainer) {
+        discountRow = document.createElement('div');
+        discountRow.id = 'checkout_discount_row';
+        discountRow.className = 'flex justify-between text-emerald-400 font-medium text-sm';
+        discountRow.innerHTML = `<span>Coupon Discount</span><span id="discount_amount_display">-${discountFormatted}</span>`;
+        summaryContainer.insertBefore(discountRow, summaryContainer.lastElementChild);
+      }
+    } else {
+      const amtDisplay = document.getElementById('discount_amount_display');
+      if (amtDisplay) amtDisplay.innerText = `-${discountFormatted}`;
+    }
+
+    const totalEl = document.querySelector('.border-t.border-white\\/10 span:last-child');
+    if (totalEl) {
+      totalEl.innerText = newTotalFormatted;
+    }
+  }
+});
+</script>

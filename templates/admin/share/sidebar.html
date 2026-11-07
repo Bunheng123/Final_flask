@@ -103,50 +103,50 @@
     </a>
     <a
       href="{{ url_for('admin_bp.admin_orders') }}"
-      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group {% if module == 'orders' or request.endpoint in ['orders', 'admin_bp.admin_orders', 'admin_bp.admin_order_detail'] %}bg-violet-light text-white before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-violet before:rounded-r{% endif %}"
     >
       <i
-        class="bi bi-bag-check-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+        class="bi bi-bag-check-fill text-base shrink-0 transition-colors {% if module == 'orders' or request.endpoint in ['orders', 'admin_bp.admin_orders', 'admin_bp.admin_order_detail'] %}text-violet{% else %}text-white/40 group-hover:text-white/70{% endif %}"
       ></i>
       <span>Orders</span>
       <span
-        class="ml-auto bg-white/5 text-[10px] font-bold px-2 py-0.5 rounded-full text-text-invert group-hover:bg-white/10"
+        class="ml-auto bg-white/5 text-[10px] font-bold px-2 py-0.5 rounded-full text-text-invert group-hover:bg-white/10 {% if module == 'orders' or request.endpoint in ['orders', 'admin_bp.admin_orders', 'admin_bp.admin_order_detail'] %}bg-violet text-white{% endif %}"
         >New</span
       >
     </a>
     <a
       href="{{ url_for('admin_bp.admin_products') }}"
-      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group {% if module in ['products', 'variants'] or request.endpoint in ['products', 'admin_bp.admin_products', 'admin_bp.admin_add_product', 'admin_bp.admin_product_variants'] %}bg-violet-light text-white before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-violet before:rounded-r{% endif %}"
     >
       <i
-        class="bi bi-box-seam-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+        class="bi bi-box-seam-fill text-base shrink-0 transition-colors {% if module in ['products', 'variants'] or request.endpoint in ['products', 'admin_bp.admin_products', 'admin_bp.admin_add_product', 'admin_bp.admin_product_variants'] %}text-violet{% else %}text-white/40 group-hover:text-white/70{% endif %}"
       ></i>
       <span>Products</span>
     </a>
     <a
       href="{{ url_for('admin_bp.admin_coupons') }}"
-      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group {% if module == 'coupons' or request.endpoint in ['coupons', 'admin_bp.admin_coupons', 'admin_bp.admin_add_coupon', 'admin_bp.admin_edit_coupon'] %}bg-violet-light text-white before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-violet before:rounded-r{% endif %}"
     >
       <i
-        class="bi bi-ticket-perforated-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+        class="bi bi-ticket-perforated-fill text-base shrink-0 transition-colors {% if module == 'coupons' or request.endpoint in ['coupons', 'admin_bp.admin_coupons', 'admin_bp.admin_add_coupon', 'admin_bp.admin_edit_coupon'] %}text-violet{% else %}text-white/40 group-hover:text-white/70{% endif %}"
       ></i>
       <span>Coupons</span>
     </a>
     <a
       href="{{ url_for('admin_bp.admin_reports') }}"
-      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group {% if module == 'reports' or request.endpoint in ['reports', 'admin_bp.admin_reports', 'admin_bp.admin_export_csv', 'admin_bp.admin_export_excel'] %}bg-violet-light text-white before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-violet before:rounded-r{% endif %}"
     >
       <i
-        class="bi bi-file-earmark-spreadsheet-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+        class="bi bi-file-earmark-spreadsheet-fill text-base shrink-0 transition-colors {% if module == 'reports' or request.endpoint in ['reports', 'admin_bp.admin_reports', 'admin_bp.admin_export_csv', 'admin_bp.admin_export_excel'] %}text-violet{% else %}text-white/40 group-hover:text-white/70{% endif %}"
       ></i>
       <span>Reports</span>
     </a>
     <a
       href="{{ url_for('admin_bp.admin_reviews') }}"
-      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group"
+      class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-invert hover:bg-white/5 hover:text-white transition-all duration-150 relative group {% if module == 'reviews' or request.endpoint in ['reviews', 'admin_bp.admin_reviews'] %}bg-violet-light text-white before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-violet before:rounded-r{% endif %}"
     >
       <i
-        class="bi bi-star-fill text-base shrink-0 text-white/40 group-hover:text-white/70 transition-colors"
+        class="bi bi-star-fill text-base shrink-0 transition-colors {% if module == 'reviews' or request.endpoint in ['reviews', 'admin_bp.admin_reviews'] %}text-violet{% else %}text-white/40 group-hover:text-white/70{% endif %}"
       ></i>
       <span>Reviews</span>
     </a>

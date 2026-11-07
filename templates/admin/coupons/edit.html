@@ -1,0 +1,193 @@
+{% extends 'admin/master.html' %}
+
+{% block tab_title %}Edit Coupon{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h2 class="text-2xl font-bold text-text">Edit Coupon: {{ coupon.code }}</h2>
+      <p class="text-xs text-text-muted mt-1">
+        Update promotional terms, spend thresholds, or active status.
+      </p>
+    </div>
+    <a
+      href="{{ url_for('admin_bp.admin_coupons') }}"
+      class="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-lg text-xs font-semibold hover:bg-paper transition"
+    >
+      <i class="bi bi-arrow-left"></i>
+      Back to Coupons
+    </a>
+  </div>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-6 space-y-2">
+        {% for category, message in messages %}
+          <div class="p-3.5 rounded-xl text-xs font-semibold border {% if category == 'success' %}bg-teal-light text-teal border-teal/20{% else %}bg-rose-light text-rose border-rose/20{% endif %}">
+            <i class="bi bi-exclamation-circle-fill mr-1.5"></i> {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Form Card -->
+  <div class="bg-card border border-border rounded-2xl shadow-sm p-6 md:p-8">
+    <form action="{{ url_for('admin_bp.admin_edit_coupon', coupon_id=coupon.id) }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Coupon Code -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Coupon Code <span class="text-rose">*</span>
+          </label>
+          <input
+            type="text"
+            name="code"
+            value="{{ coupon.code }}"
+            required
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs font-mono font-bold uppercase text-text focus:outline-none focus:border-violet transition"
+          />
+        </div>
+
+        <!-- Discount Type -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Discount Type <span class="text-rose">*</span>
+          </label>
+          <select
+            name="discount_type"
+            id="discount_type"
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs font-semibold text-text focus:outline-none focus:border-violet transition"
+          >
+            <option value="percent" {% if coupon.discount_type == 'percent' %}selected{% endif %}>Percentage (%) Off Subtotal</option>
+            <option value="fixed" {% if coupon.discount_type == 'fixed' %}selected{% endif %}>Fixed Dollar ($) Amount Off</option>
+          </select>
+        </div>
+
+        <!-- Discount Value -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Discount Value <span class="text-rose">*</span>
+          </label>
+          <input
+            type="number"
+            step="any"
+            name="value"
+            value="{{ display_value }}"
+            required
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet transition"
+          />
+          <span class="text-[11px] text-text-muted" id="value_hint">
+            {% if coupon.discount_type == 'percent' %}
+              Percentage discount (e.g. 10 for 10% off).
+            {% else %}
+              Dollar discount (e.g. 20.00 for $20 off).
+            {% endif %}
+          </span>
+        </div>
+
+        <!-- Min Spend -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Minimum Order Spend ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            name="min_spend"
+            value="{{ min_spend_display }}"
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet transition"
+          />
+        </div>
+
+        <!-- Max Discount Cap -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Maximum Discount Cap ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            name="max_discount"
+            value="{{ max_discount_display }}"
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet transition"
+          />
+        </div>
+
+        <!-- Total Usage Limit -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Global Usage Limit (Used: {{ coupon.used_count }})
+          </label>
+          <input
+            type="number"
+            name="usage_limit"
+            value="{{ coupon.usage_limit if coupon.usage_limit is not none else '' }}"
+            placeholder="Unlimited"
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet transition"
+          />
+        </div>
+
+        <!-- Per-Customer Limit -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-text uppercase tracking-wider">
+            Per-Customer Limit
+          </label>
+          <input
+            type="number"
+            name="per_customer_limit"
+            value="{{ coupon.per_customer_limit if coupon.per_customer_limit is not none else '' }}"
+            class="bg-paper border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet transition"
+          />
+        </div>
+
+        <!-- Active Toggle -->
+        <div class="flex flex-col justify-center">
+          <label class="flex items-center gap-3 cursor-pointer mt-3">
+            <input
+              type="checkbox"
+              name="is_active"
+              value="1"
+              {% if coupon.is_active %}checked{% endif %}
+              class="w-4 h-4 rounded border-border text-violet focus:ring-violet"
+            />
+            <span class="text-xs font-semibold text-text">Coupon is active and available for redemption</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-8 pt-6 border-t border-border flex items-center justify-end gap-3">
+        <a
+          href="{{ url_for('admin_bp.admin_coupons') }}"
+          class="border border-border px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-paper transition"
+        >
+          Cancel
+        </a>
+        <button
+          type="submit"
+          class="bg-violet hover:bg-[#5b4de8] text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-violet/20 hover:shadow-violet/35 transition cursor-pointer"
+        >
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('discount_type').addEventListener('change', function() {
+  const hint = document.getElementById('value_hint');
+  if (this.value === 'percent') {
+    hint.textContent = 'Enter percentage (e.g. 10 for 10% off).';
+  } else {
+    hint.textContent = 'Enter dollar amount in dollars (e.g. 20.00 for $20 off).';
+  }
+});
+</script>
+{% endblock %}
+
