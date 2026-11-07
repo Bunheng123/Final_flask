@@ -64,7 +64,23 @@ def do_checkout():
     subtotal = sum(item['price'] * item['qty'] for item in cart_before)
     shipping = 0
     total = subtotal + shipping
+
+    # Persist the order in the database so it appears in the customer's Order History
+    saved_order = None
     order_id = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S')
+    try:
+        from services.order_service import create_order
+        from flask import session
+        user_id = session.get('user_id')
+        saved_order = create_order(
+            customer_data=order_info,
+            cart_items=cart_before,
+            user_id=user_id
+        )
+        if saved_order:
+            order_id = saved_order.order_number
+    except Exception as err:
+        current_app.logger.error(f"Failed to persist order to database: {err}")
 
     # Build the Telegram order message.
     message = f"<b>✅ New Order #{order_id}</b>\n"
@@ -111,6 +127,7 @@ def do_checkout():
     response = make_response(render_template(
         'front/checkout.html',
         order_placed=True,
+        order=saved_order,
         order_info=order_info,
         cart_items=cart_before,
         subtotal=subtotal,

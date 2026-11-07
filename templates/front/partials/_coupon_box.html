@@ -3,7 +3,7 @@
 <div class="p-4 rounded-3xl bg-slate-900 border border-slate-700/80 mb-6">
   <div class="flex items-center gap-2 mb-2">
     <i class="bi bi-tag-fill text-indigo-400"></i>
-    <label for="coupon_input" class="text-sm font-semibold text-slate-200">Have a Promo Code?</label>
+    <label for="coupon_input" class="text-sm font-semibold text-slate-200">Have a Promo Code? <span class="text-xs font-normal text-slate-400">(Optional)</span></label>
   </div>
   
   <div class="flex gap-2">
@@ -45,6 +45,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const feedbackText = document.getElementById('coupon_feedback_text');
 
   if (!applyBtn || !couponInput) return;
+
+  couponInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (couponInput.value.trim()) {
+        applyBtn.click();
+      }
+    }
+  });
 
   applyBtn.addEventListener('click', async function() {
     const code = couponInput.value.trim();
