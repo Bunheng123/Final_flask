@@ -5,6 +5,7 @@ Provides unified user session access, route protection decorators, and URL valid
 from functools import wraps
 from urllib.parse import urlparse
 from flask import session, request, redirect, url_for, abort, g
+from extensions import db
 from models.user import User
 
 def is_safe_next_url(target: str) -> bool:
@@ -28,9 +29,10 @@ def current_user() -> User | None:
     if not session.get('is_login') or not session.get('user_id'):
         return None
 
-    if not hasattr(g, '_current_user'):
-        user_id = session.get('user_id')
-        g._current_user = User.query.get(user_id)
+    user_id = session.get('user_id')
+    cached = getattr(g, '_current_user', None)
+    if cached is None or cached.id != user_id:
+        g._current_user = db.session.get(User, user_id)
     return g._current_user
 
 def login_required(f):

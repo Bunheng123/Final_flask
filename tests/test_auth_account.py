@@ -277,3 +277,85 @@ def test_customer_order_cancel_expired_rejected(client):
     unchanged = Order.query.filter_by(order_number='ORD-OLD-002').first()
     assert unchanged.status == 'pending'
 
+
+def test_customer_order_history_strictly_scoped_to_purchases(client):
+    """Verify that order history strictly displays ONLY what the authenticated user bought."""
+    # Create second regular user in the in-memory test DB
+    user3 = User(
+        username='second_user',
+        email='second@techstore.test',
+        password=generate_password_hash('password123'),
+        role='user'
+    )
+    db.session.add(user3)
+    db.session.commit()
+
+    # Seed distinct orders for User 2 (test_user) and User 3 (second_user)
+    order_user2 = Order(
+        order_number='ORD-ISOLATE-U2',
+        user_id=2,
+        customer_name='Test User 2',
+        email='user@techstore.test',
+        phone='012345678',
+        address='Phnom Penh, Cambodia',
+        payment_method='khqr',
+        status='confirmed',
+        subtotal_cents=15000,
+        total_cents=15000,
+        created_at=utc_now()
+    )
+    order_user3 = Order(
+        order_number='ORD-ISOLATE-U3',
+        user_id=user3.id,
+        customer_name='Second User',
+        email='second@techstore.test',
+        phone='098765432',
+        address='Phnom Penh, Cambodia',
+        payment_method='cod',
+        status='pending',
+        subtotal_cents=25000,
+        total_cents=25000,
+        created_at=utc_now()
+    )
+    db.session.add_all([order_user2, order_user3])
+    db.session.commit()
+
+    # 1. As User 2: Must only see ORD-ISOLATE-U2, NEVER ORD-ISOLATE-U3
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 2
+        sess['username'] = 'test_user'
+        sess['email'] = 'user@techstore.test'
+        sess['role'] = 'user'
+
+    res_u2 = client.get('/account/orders')
+    assert res_u2.status_code == 200
+    assert b"ORD-ISOLATE-U2" in res_u2.data
+    assert b"ORD-ISOLATE-U3" not in res_u2.data
+
+    # User 2 attempting to view User 3's order detail must return 404
+    res_det_forbidden = client.get('/account/orders/ORD-ISOLATE-U3')
+    assert res_det_forbidden.status_code == 404
+
+    # User 2 attempting to cancel User 3's order must return 404
+    res_cancel_forbidden = client.post('/account/orders/ORD-ISOLATE-U3/cancel')
+    assert res_cancel_forbidden.status_code == 404
+
+    # 2. As User 3: Must only see ORD-ISOLATE-U3, NEVER ORD-ISOLATE-U2
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = user3.id
+        sess['username'] = 'second_user'
+        sess['email'] = 'second@techstore.test'
+        sess['role'] = 'user'
+
+    res_u3 = client.get('/account/orders')
+    assert res_u3.status_code == 200
+    assert b"ORD-ISOLATE-U3" in res_u3.data
+    assert b"ORD-ISOLATE-U2" not in res_u3.data
+
+    # User 3 can view their own order detail
+    res_det_u3 = client.get('/account/orders/ORD-ISOLATE-U3')
+    assert res_det_u3.status_code == 200
+    assert b"ORD-ISOLATE-U3" in res_det_u3.data
+

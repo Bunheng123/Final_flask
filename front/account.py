@@ -113,6 +113,17 @@ def account():
     if not user:
         return redirect(url_for('front_bp.login'))
 
+    # Auto-associate orphan guest orders placed with this user's email
+    if user.email:
+        orphan_orders = Order.query.filter(
+            Order.user_id.is_(None),
+            db.func.lower(Order.email) == user.email.lower()
+        ).all()
+        if orphan_orders:
+            for orphan in orphan_orders:
+                orphan.user_id = user.id
+            db.session.commit()
+
     # Fetch recent orders summary for customer overview
     recent_orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(5).all()
     total_orders_count = Order.query.filter_by(user_id=user.id).count()
@@ -140,6 +151,17 @@ def account_orders():
     user = current_user()
     if not user:
         return redirect(url_for('front_bp.login'))
+
+    # Auto-associate orphan guest orders placed with this user's email
+    if user.email:
+        orphan_orders = Order.query.filter(
+            Order.user_id.is_(None),
+            db.func.lower(Order.email) == user.email.lower()
+        ).all()
+        if orphan_orders:
+            for orphan in orphan_orders:
+                orphan.user_id = user.id
+            db.session.commit()
 
     status_filter = request.args.get('status', 'all').lower()
     search_q = request.args.get('q', '').strip()
@@ -192,6 +214,18 @@ def account_order_detail(order_number: str):
         return redirect(url_for('front_bp.login'))
 
     order = Order.query.filter_by(order_number=order_number, user_id=user.id).first()
+    if not order and user.email:
+        # Check if order was placed as guest with the customer's registered email
+        guest_order = Order.query.filter(
+            Order.order_number == order_number,
+            Order.user_id.is_(None),
+            db.func.lower(Order.email) == user.email.lower()
+        ).first()
+        if guest_order:
+            guest_order.user_id = user.id
+            db.session.commit()
+            order = guest_order
+
     if not order:
         abort(404)
 
@@ -228,6 +262,18 @@ def account_order_cancel(order_number: str):
         return redirect(url_for('front_bp.login'))
 
     order = Order.query.filter_by(order_number=order_number, user_id=user.id).first()
+    if not order and user.email:
+        # Check if order was placed as guest with the customer's registered email
+        guest_order = Order.query.filter(
+            Order.order_number == order_number,
+            Order.user_id.is_(None),
+            db.func.lower(Order.email) == user.email.lower()
+        ).first()
+        if guest_order:
+            guest_order.user_id = user.id
+            db.session.commit()
+            order = guest_order
+
     if not order:
         abort(404)
 
