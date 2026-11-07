@@ -37,6 +37,8 @@ static/images/user/*
 
 # Flask / environment
 .env
+.env.*
+!.env.example
 .flaskenv
 
 # OS-generated files
