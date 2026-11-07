@@ -135,7 +135,62 @@
     </div>
   </div>
 
-  <!-- Section 1: Daily Revenue Breakdown Table -->
+  <!-- Section 1: Recent Orders & Invoices -->
+  <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+    <div class="p-5 border-b border-border flex items-center justify-between">
+      <div>
+        <h3 class="font-bold text-sm text-text">Orders & Downloadable Invoices</h3>
+        <p class="text-[11px] text-text-muted">Directly preview and download PDF invoices for recorded customer orders.</p>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="border-b border-border bg-paper/50 text-[11px] uppercase tracking-wider text-text-muted font-bold">
+            <th class="py-3.5 px-5">Order #</th>
+            <th class="py-3.5 px-5">Date</th>
+            <th class="py-3.5 px-5">Customer</th>
+            <th class="py-3.5 px-5">Status</th>
+            <th class="py-3.5 px-5 text-right">Total</th>
+            <th class="py-3.5 px-5 text-right">Invoice</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border text-text">
+          {% if sales.orders %}
+            {% for o in sales.orders %}
+            <tr class="hover:bg-paper/40 transition">
+              <td class="py-3.5 px-5 font-mono font-bold text-violet">{{ o.order_number }}</td>
+              <td class="py-3.5 px-5 text-text-muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '—' }}</td>
+              <td class="py-3.5 px-5 font-medium">{{ o.customer_name }}</td>
+              <td class="py-3.5 px-5">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border {% if o.status in ['confirmed', 'delivered'] %}bg-teal-light text-teal border-teal/20{% elif o.status == 'cancelled' %}bg-rose-light text-rose border-rose/20{% else %}bg-amber-light text-amber border-amber/20{% endif %}">
+                  {{ o.status|upper }}
+                </span>
+              </td>
+              <td class="py-3.5 px-5 text-right font-mono font-bold">${{ "%.2f"|format(o.total_cents / 100) }}</td>
+              <td class="py-3.5 px-5 text-right">
+                <a
+                  href="{{ url_for('front_bp.download_invoice', order_id=o.id) }}"
+                  target="_blank"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet/10 hover:bg-violet/20 text-violet font-semibold text-[11px] transition"
+                  title="Download PDF Invoice"
+                >
+                  <i class="bi bi-file-earmark-pdf-fill text-rose"></i> Download PDF
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center py-8 text-text-muted">No orders found for this date range.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 2: Daily Sales & Accounting Breakdown Table -->
   <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
     <div class="p-5 border-b border-border flex items-center justify-between">
       <div>
