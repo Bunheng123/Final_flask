@@ -1,5 +1,6 @@
 import json
 import pytest
+from extensions import db
 from helpers.currency import (
     khr_format,
     usd_format,
@@ -165,7 +166,7 @@ def test_api_payment_check_endpoint(client, monkeypatch):
     assert 'paid_at' in data2['data']
 
 
-def test_checkout_payment_integration(client, monkeypatch):
+def test_checkout_payment_integration(client, app, monkeypatch):
     # Mock telegram sending to avoid background thread network calls
     monkeypatch.setattr('helpers.telegram.send_telegram', lambda *args, **kwargs: None)
 
@@ -183,7 +184,8 @@ def test_checkout_payment_integration(client, monkeypatch):
 
     # 2. POST /checkout with payment='khqr'
     res_post_khqr = client.post('/checkout', data={
-        'name': 'John Doe',
+        'first_name': 'John',
+        'last_name': 'Doe',
         'email': 'john@example.com',
         'phone': '012345678',
         'address': '123 Street, Phnom Penh',
@@ -210,8 +212,20 @@ def test_checkout_payment_integration(client, monkeypatch):
 
     # 3. POST /checkout with payment='split'
     client.set_cookie('cart_list', json.dumps(cart_data))
+    with app.app_context():
+        from models.user import User
+        user = db.session.get(User, 2)
+        user.wallet_balance_khr = 100
+        db.session.commit()
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 2
+        sess['username'] = 'test_user'
+        sess['email'] = 'user@techstore.test'
+        sess['role'] = 'user'
     res_post_split = client.post('/checkout', data={
-        'name': 'Jane Doe',
+        'first_name': 'Jane',
+        'last_name': 'Doe',
         'email': 'jane@example.com',
         'phone': '098765432',
         'address': '456 Boulevard, Phnom Penh',
@@ -223,3 +237,9 @@ def test_checkout_payment_integration(client, monkeypatch):
     assert b"Order placed successfully!</h2>" not in res_post_split.data
     assert b"khqr-payment-panel" in res_post_split.data
     assert b"data:image/png;base64," in res_post_split.data
+    with app.app_context():
+        from models.wallet_transaction import WalletTransaction
+        debit = WalletTransaction.query.filter_by(transaction_type='debit').one()
+        assert debit.amount_khr == -100
+        assert debit.status == 'pending'
+        assert db.session.get(User, 2).wallet_balance_khr == 0

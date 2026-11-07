@@ -1,6 +1,7 @@
 import hashlib
 import os
 from datetime import datetime, timedelta, timezone
+from flask import has_app_context
 
 # Ensure environment variables from .env file are loaded
 try:
@@ -180,7 +181,41 @@ def generate_khqr(
 def get_payment_status(reference_md5):
     payment = _PAYMENT_CACHE.get(reference_md5)
     if not payment:
-        return {'success': False, 'status': 'not_found'}
+        if not has_app_context():
+            return {'success': False, 'status': 'not_found'}
+
+        from models.order import Order
+        from models.wallet_transaction import WalletTransaction
+
+        transaction = WalletTransaction.query.filter_by(reference=reference_md5).first()
+        order = Order.query.filter_by(payment_reference=reference_md5).first()
+        if transaction is None and order is None:
+            return {'success': False, 'status': 'not_found'}
+
+        if transaction and transaction.transaction_type == 'top_up':
+            amount_khr = transaction.amount_khr
+            known_status = (
+                'paid' if transaction.status == 'completed'
+                else 'expired' if transaction.status == 'expired'
+                else 'pending'
+            )
+        elif order is not None:
+            amount_khr = order.total_khr - order.wallet_used_khr
+            known_status = (
+                'paid' if order.payment_status in {'paid', 'refunded'}
+                else 'expired' if order.payment_status == 'expired'
+                else 'pending'
+            )
+        else:
+            return {'success': False, 'status': 'not_found'}
+
+        payment = {
+            'reference': reference_md5,
+            'reference_md5': reference_md5,
+            'amount_khr': amount_khr,
+            'status': known_status,
+        }
+        _PAYMENT_CACHE[reference_md5] = payment
 
     if payment['status'] == 'pending':
         if not get_khqr_config()['token']:

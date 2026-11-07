@@ -35,6 +35,15 @@
         </div>
 
         <div class="flex items-center gap-3">
+          {% if order.status in ['pending', 'confirmed'] %}
+            <form method="post" action="{{ url_for('front_bp.account_cancel_order', order_number=order.order_number) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="px-4 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold transition"
+                onclick="return confirm('Cancel this order? Any paid amount will be refunded to your wallet.')">
+                Cancel Order
+              </button>
+            </form>
+          {% endif %}
           <a href="{{ url_for('front_bp.invoice_pdf', order_number=order.order_number) if 'front_bp.invoice_pdf' in url_for.__globals__ else '#' }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -46,6 +55,53 @@
         </div>
       </div>
     </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div role="status" class="mb-6 rounded-xl border px-4 py-3 {{ 'border-red-500/30 bg-red-500/10 text-red-200' if category == 'error' else 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if payment_check_url and order.payment_status in ['pending', 'cancelled'] %}
+      <div id="order-payment-status" data-payment-check-url="{{ payment_check_url }}"
+        class="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        Checking the KHQR payment status...
+      </div>
+      <script>
+        (function () {
+          const panel = document.getElementById('order-payment-status');
+          const checkUrl = panel.dataset.paymentCheckUrl;
+          let checking = false;
+          let timer;
+          async function checkPayment() {
+            if (checking) return;
+            checking = true;
+            try {
+              const response = await fetch(checkUrl, { cache: 'no-store', headers: { Accept: 'application/json' } });
+              const result = await response.json();
+              if (response.ok && result.success && result.data.status === 'paid') {
+                window.clearInterval(timer);
+                panel.textContent = 'KHQR payment confirmed. Updating order status...';
+                window.location.reload();
+              } else if (response.ok && result.success && result.data.status === 'expired') {
+                window.clearInterval(timer);
+                panel.textContent = 'KHQR payment expired. Any reserved wallet funds have been returned.';
+              } else {
+                panel.textContent = 'KHQR payment is awaiting confirmation.';
+              }
+            } catch (error) {
+              panel.textContent = 'Payment status is temporarily unavailable.';
+            } finally {
+              checking = false;
+            }
+          }
+          checkPayment();
+          timer = window.setInterval(checkPayment, 5000);
+        })();
+      </script>
+    {% endif %}
 
     <div class="grid lg:grid-cols-3 gap-8">
       <!-- Order Items List -->
@@ -91,6 +147,14 @@
             <span>Total</span>
             <span class="text-indigo-400">${{ "%.2f"|format(order.total_cents / 100) }}</span>
           </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Payment status</span>
+            <span class="capitalize">{{ order.payment_status }}</span>
+          </div>
+          <div class="flex justify-between text-indigo-300">
+            <span>Order total in KHR</span>
+            <span>{{ khr_format(order.total_khr) }}</span>
+          </div>
         </div>
 
         <div class="bg-slate-800/80 rounded-3xl p-6 border border-white/10 shadow-xl space-y-3 text-sm">
@@ -120,4 +184,3 @@
   {% include 'front/share/footer.html' %}
 </body>
 </html>
-

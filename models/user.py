@@ -14,11 +14,18 @@ class User(db.Model):
     email = db.Column(db.String(120), nullable=False, unique=True)
     phone = db.Column(db.String(50), nullable=True)
     address = db.Column(db.Text, nullable=True)
+    wallet_balance_khr = db.Column(db.Integer, nullable=False, default=0, server_default='0')
     role = db.Column(db.String(120), nullable=False, default="user")
     is_active = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now, server_default=func.now())
 
     orders = db.relationship('Order', backref='user', lazy='dynamic', order_by='desc(Order.created_at)')
+    wallet_transactions = db.relationship(
+        'WalletTransaction',
+        backref='user',
+        lazy='dynamic',
+        order_by='desc(WalletTransaction.created_at)',
+    )
 
     def __repr__(self):
         return f"<User {self.id}: {self.username}>"

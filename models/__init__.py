@@ -9,6 +9,7 @@ from models.coupon import Coupon
 from models.coupon_redemption import CouponRedemption
 from models.wishlist_item import WishlistItem
 from models.product_review import ProductReview
+from models.wallet_transaction import WalletTransaction
 
 __all__ = [
     'User',
@@ -22,4 +23,5 @@ __all__ = [
     'CouponRedemption',
     'WishlistItem',
     'ProductReview',
+    'WalletTransaction',
 ]

@@ -120,6 +120,11 @@
       {% else %}
         <!-- Standard Checkout Form -->
         <h2 class="text-2xl font-bold">Billing Details</h2>
+        {% if checkout_error %}
+          <div role="alert" class="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {{ checkout_error }}
+          </div>
+        {% endif %}
 
         <div class="grid md:grid-cols-2 gap-4">
           <input type="text" name="first_name" placeholder="First Name" value="{{ customer_defaults.first_name if customer_defaults is defined else '' }}" class="p-3 bg-slate-800 rounded" required />
@@ -148,6 +153,18 @@
               <span class="text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">Instant</span>
             </span>
           </label>
+
+          {% if is_authenticated %}
+            <label class="flex items-center gap-3 bg-slate-800 p-3 rounded cursor-pointer border border-slate-700 hover:border-indigo-500/60">
+              <input type="radio" name="payment" value="wallet" id="payment-wallet" onchange="togglePaymentMethod('wallet')" />
+              <span>Wallet only — {{ khr_format(wallet_balance_khr) }}</span>
+            </label>
+
+            <label class="flex items-center gap-3 bg-slate-800 p-3 rounded cursor-pointer border border-slate-700 hover:border-indigo-500/60">
+              <input type="radio" name="payment" value="split" id="payment-split" onchange="togglePaymentMethod('split')" />
+              <span>Wallet + KHQR — use available wallet balance first</span>
+            </label>
+          {% endif %}
         </div>
 
         <div class="grid gap-4 mt-4">
@@ -198,6 +215,26 @@
             </div>
             {% endif %}
           </div>
+
+          {% if is_authenticated %}
+            <div id="panel-wallet" class="hidden p-4 rounded-3xl bg-slate-800 border border-indigo-500/30">
+              <p class="font-semibold text-white">Pay from your customer wallet</p>
+              <p class="mt-2 text-sm text-slate-400">
+                Available balance: {{ khr_format(wallet_balance_khr) }}. The order total must be covered by your wallet.
+              </p>
+              <a href="{{ url_for('front_bp.account_wallet') }}" class="mt-2 inline-block text-sm text-indigo-300 hover:underline">
+                Add wallet funds
+              </a>
+            </div>
+            <div id="panel-split" class="hidden p-4 rounded-3xl bg-slate-800 border border-indigo-500/30">
+              <p class="font-semibold text-white">Split payment</p>
+              <p class="mt-2 text-sm text-slate-400">
+                Your available wallet balance will be reserved now. Pay the remaining amount by KHQR to complete the order.
+                If the QR expires, the reserved wallet amount is returned automatically.
+              </p>
+              <p class="mt-2 text-sm text-indigo-300">Available wallet balance: {{ khr_format(wallet_balance_khr) }}</p>
+            </div>
+          {% endif %}
         </div>
       {% endif %}
     </div>
@@ -283,37 +320,27 @@
   <!-- Toggle script for Payment Methods -->
   <script>
     function togglePaymentMethod(method) {
-      const codPanel = document.getElementById('panel-cod');
-      const qrPanel  = document.getElementById('panel-qr');
-      const labelCod = document.getElementById('payment-cod') && document.getElementById('payment-cod').closest('label');
-      const labelQr  = document.getElementById('payment-qr')  && document.getElementById('payment-qr').closest('label');
-
-      if (!codPanel || !qrPanel) return;
-
-      if (method === 'qr') {
-        codPanel.classList.add('hidden');
-        qrPanel.classList.remove('hidden');
-        if (labelQr)  { labelQr.classList.add('border-indigo-500/60');  labelQr.classList.remove('border-transparent'); }
-        if (labelCod) { labelCod.classList.remove('border-indigo-500/60'); labelCod.classList.add('border-transparent'); }
-      } else {
-        codPanel.classList.remove('hidden');
-        qrPanel.classList.add('hidden');
-        if (labelCod) { labelCod.classList.add('border-indigo-500/60');  labelCod.classList.remove('border-transparent'); }
-        if (labelQr)  { labelQr.classList.remove('border-indigo-500/60'); labelQr.classList.add('border-transparent'); }
-      }
+      ['cod', 'qr', 'wallet', 'split'].forEach(function (name) {
+        const panel = document.getElementById('panel-' + name);
+        const radio = document.getElementById('payment-' + name);
+        if (panel) panel.classList.toggle('hidden', name !== method);
+        if (radio) {
+          const label = radio.closest('label');
+          if (label) {
+            label.classList.toggle('border-indigo-500/60', name === method);
+            label.classList.toggle('border-transparent', name !== method);
+          }
+        }
+      });
     }
 
     // Auto-detect on page load
     (function() {
-      const qrRadio  = document.getElementById('payment-qr');
-      const codRadio = document.getElementById('payment-cod');
-      if (qrRadio && qrRadio.checked) {
-        togglePaymentMethod('qr');
-      } else if (codRadio && codRadio.checked) {
-        togglePaymentMethod('cod');
-      }
+      const selectedRadio = document.querySelector('input[name="payment"]:checked');
+      if (selectedRadio) togglePaymentMethod(selectedRadio.value);
 
       // Wire up clicks on the QR image itself to select the QR radio
+      const qrRadio = document.getElementById('payment-qr');
       const qrImg = document.querySelector('#panel-qr img');
       if (qrImg && qrRadio) {
         qrImg.style.cursor = 'pointer';
