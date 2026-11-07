@@ -14,12 +14,16 @@ def _serialize_product(p):
     price = from_cents(default_var.price_cents) if default_var else 0.0
     stock = sum(v.stock for v in active_vars) if active_vars else 0
     cat_name = p.category.name if p.category else ""
+    brand_name = p.brand.name if p.brand else ""
 
     return {
         "id": p.id,
         "name": p.name,
         "description": p.description,
         "category": cat_name,
+        "category_id": p.category_id,
+        "brand": brand_name,
+        "brand_id": p.brand_id,
         "image": p.image,
         "price": price,
         "stock": stock,
@@ -42,15 +46,15 @@ def _serialize_product(p):
 @api_bp.get('/products', endpoint='get_products')
 @api_bp.get('/product', endpoint='get_product_list')
 def api_products():
-    category = request.args.get('category')
-    search = request.args.get('q')
+    category = request.args.get('category') or request.args.get('category_id')
+    brand = request.args.get('brand') or request.args.get('brand_id')
+    search = request.args.get('q') or request.args.get('search')
 
-    db_products = stock_service.get_active_products(search=search)
-    if category:
-        db_products = [
-            p for p in db_products
-            if p.category and p.category.name.lower() == category.lower()
-        ]
+    db_products = stock_service.get_active_products(
+        category=category,
+        brand=brand,
+        search=search
+    )
 
     if db_products:
         result = [_serialize_product(p) for p in db_products]
@@ -64,7 +68,7 @@ def api_products():
     from product import products as mock_products
     result = mock_products
     if category:
-        result = [p for p in result if p.get('category', '').lower() == category.lower()]
+        result = [p for p in result if str(p.get('category', '')).lower() == str(category).lower()]
     if search:
         search_lower = search.lower()
         result = [

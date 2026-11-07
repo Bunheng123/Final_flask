@@ -36,7 +36,7 @@
   {% endwith %}
 
   <!-- Edit Form -->
-  <form action="{{ url_for('admin_bp.admin_edit_brand', brand_id=brand.id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+  <form action="{{ url_for('admin_bp.admin_edit_brand', brand_id=brand.id) }}" method="POST" class="space-y-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
     <div class="bg-card border border-border rounded-2xl p-6 shadow-card">
@@ -96,45 +96,23 @@
         {% if brand.logo %}
           <div>
             <label class="block text-xs font-semibold text-text mb-1">
-              Current Logo
+              Current Logo Preview
             </label>
             <div class="flex items-center gap-4 p-3 bg-paper border border-border rounded-xl">
               <div class="w-14 h-14 bg-card border border-border rounded-lg p-1 flex items-center justify-center shrink-0">
-                {% if brand.logo.startswith('http') %}
-                  <img src="{{ brand.logo }}" alt="{{ brand.name }}" class="w-full h-full object-contain"/>
-                {% else %}
-                  <img src="{{ url_for('static', filename=brand.logo) }}" alt="{{ brand.name }}" class="w-full h-full object-contain"/>
-                {% endif %}
+                <img src="{{ brand.logo }}" alt="{{ brand.name }}" class="w-full h-full object-contain" onerror="this.src='/static/images/no-image.jpg'"/>
               </div>
               <div class="text-xs text-text-muted leading-tight">
-                <span class="font-mono text-[11px] text-text block mb-1">{{ brand.logo }}</span>
-                <label class="inline-flex items-center gap-1.5 text-red-400 hover:text-red-300 cursor-pointer">
-                  <input type="checkbox" name="clear_logo" value="1" class="rounded border-border"/>
-                  <span>Remove current logo</span>
-                </label>
+                <span class="font-mono text-[11px] text-text block mb-1 break-all">{{ brand.logo }}</span>
               </div>
             </div>
           </div>
         {% endif %}
 
-        <!-- Logo Upload -->
+        <!-- Logo URL -->
         <div>
           <label class="block text-xs font-semibold text-text mb-1">
-            Upload New Logo File
-          </label>
-          <input
-            type="file"
-            name="logo_file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            class="w-full border border-border bg-paper rounded-xl px-4 py-2 text-xs text-text focus:outline-none focus:border-violet file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet file:text-white hover:file:bg-[#5b4de8] file:cursor-pointer"
-          />
-          <p class="text-[11px] text-text-muted mt-1">Accepted formats: PNG, JPG, JPEG, GIF, WEBP. Uploading a file overrides the logo URL.</p>
-        </div>
-
-        <!-- Logo URL Fallback -->
-        <div>
-          <label class="block text-xs font-semibold text-text mb-1">
-            Or New Logo URL (Fallback)
+            Brand Logo Image URL (Optional)
           </label>
           <input
             type="url"
@@ -143,6 +121,7 @@
             placeholder="https://example.com/logo.png"
             class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
           />
+          <p class="text-[11px] text-text-muted mt-1">Enter a direct image URL, or clear to remove logo.</p>
         </div>
 
         <!-- Description -->
@@ -178,3 +157,4 @@
   </form>
 </div>
 {% endblock %}
+

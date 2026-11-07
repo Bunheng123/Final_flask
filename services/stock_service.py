@@ -145,24 +145,55 @@ def attach_view_attributes(product: Optional[Product]) -> Optional[Product]:
 # ==========================================
 
 def get_active_products(
+    category: Optional[Union[int, str]] = None,
+    brand: Optional[Union[int, str]] = None,
+    search: Optional[str] = None,
     category_id: Optional[int] = None,
     brand_id: Optional[int] = None,
-    search: Optional[str] = None
+    search_query: Optional[str] = None
 ) -> List[Product]:
     """
     Fetch active products and their linked product variants.
-    Supports optional category filter, brand filter, and search query.
+    Supports filtering by:
+      - category (id, slug, or name)
+      - brand (id, slug, or name)
+      - search keyword (matching product name, description, brand, or category)
     """
     query = Product.query.filter(Product.is_active == True)
-    if category_id is not None:
-        query = query.filter(Product.category_id == category_id)
-    if brand_id is not None:
-        query = query.filter(Product.brand_id == brand_id)
-    if search:
-        term = f"%{search.strip()}%"
+
+    # 1. Category filter
+    cat_target = category if category is not None else category_id
+    if cat_target is not None:
+        if isinstance(cat_target, int) or (isinstance(cat_target, str) and cat_target.isdigit()):
+            query = query.filter(Product.category_id == int(cat_target))
+        elif isinstance(cat_target, str) and cat_target.strip():
+            c_val = cat_target.strip()
+            query = query.filter(
+                Product.category.has((Category.slug == c_val.lower()) | (Category.name.ilike(c_val)))
+            )
+
+    # 2. Brand filter
+    brand_target = brand if brand is not None else brand_id
+    if brand_target is not None:
+        if isinstance(brand_target, int) or (isinstance(brand_target, str) and brand_target.isdigit()):
+            query = query.filter(Product.brand_id == int(brand_target))
+        elif isinstance(brand_target, str) and brand_target.strip():
+            b_val = brand_target.strip()
+            query = query.filter(
+                Product.brand.has((Brand.slug == b_val.lower()) | (Brand.name.ilike(b_val)))
+            )
+
+    # 3. Search query
+    term_val = search if search is not None else search_query
+    if term_val and str(term_val).strip():
+        term = f"%{str(term_val).strip()}%"
         query = query.filter(
-            (Product.name.ilike(term)) | (Product.description.ilike(term))
+            (Product.name.ilike(term)) |
+            (Product.description.ilike(term)) |
+            (Product.brand.has(Brand.name.ilike(term))) |
+            (Product.category.has(Category.name.ilike(term)))
         )
+
     products = query.order_by(Product.id.asc()).all()
     for p in products:
         attach_view_attributes(p)

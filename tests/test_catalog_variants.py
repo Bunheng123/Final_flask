@@ -1126,6 +1126,136 @@ def test_admin_product_brand_assignment_flow(client, sample_catalog):
         assert updated_prod.brand_id is None
 
 
+# ==========================================
+# 14. XSS-Safe Keyword Highlighting & Storefront Filtering Tests
+# ==========================================
+
+def test_highlight_query_xss_safety_and_matching():
+    """
+    Test XSS-Safe Keyword Highlighting helper.
+    Contract:
+      - Neutralizes script tags into &lt;script&gt;
+      - Wraps matched query into <mark class="search-highlight">
+      - Case-insensitive matching
+    """
+    from helpers.highlight import highlight_query
+
+    # 1. Standard match & case preservation
+    res1 = highlight_query("Lenovo ThinkPad X1 Carbon", "thinkpad")
+    assert '<mark class="search-highlight">ThinkPad</mark>' in str(res1)
+
+    # 2. Empty query returns clean escaped string
+    res2 = highlight_query("Regular Product Name", "")
+    assert str(res2) == "Regular Product Name"
+    assert "<mark" not in str(res2)
+
+    # 3. None handling
+    assert str(highlight_query(None, "test")) == ""
+
+    # 4. CRITICAL ACCEPTANCE TEST: Neutralize <script>alert(1)</script>
+    xss_val = "<script>alert(1)</script>"
+    res_xss = highlight_query(xss_val, "alert")
+    res_str = str(res_xss)
+
+    # MUST NOT contain unescaped raw <script> tags
+    assert "<script>" not in res_str
+    assert "</script>" not in res_str
+
+    # MUST contain properly escaped HTML entities with highlight
+    assert "&lt;script&gt;<mark class=\"search-highlight\">alert</mark>(1)&lt;/script&gt;" == res_str
+
+    # 5. Query containing raw script tags
+    res_xss_query = highlight_query(xss_val, "<script>")
+    res_query_str = str(res_xss_query)
+    assert "<script>" not in res_query_str
+    assert '<mark class="search-highlight">&lt;script&gt;</mark>' in res_query_str
+
+
+def test_storefront_category_brand_and_search_filtering(client, sample_catalog):
+    """
+    Test storefront /products filtering by Category, Brand, and search query (q).
+    Also tests searching with XSS payload to ensure safe response rendering.
+    """
+    with client.application.app_context():
+        # Create brand & products
+        asus = stock_service.create_brand(name="ASUS ROG", slug="asus-rog")
+        cat_id = sample_catalog["cat_laptops_id"]
+        prod = stock_service.create_product(
+            name="ASUS ROG Zephyrus G16",
+            category_id=cat_id,
+            description="Ultra-slim high performance gaming laptop",
+            price_cents=219900,
+            stock=12,
+            sku="ROG-G16-01",
+            brand_id=asus.id
+        )
+
+    # 1. Filter by category slug
+    res_cat = client.get('/products?category=laptops')
+    assert res_cat.status_code == 200
+    html_cat = res_cat.data.decode('utf-8')
+    assert "ThinkPad X1 Carbon" in html_cat
+    assert "ASUS ROG Zephyrus G16" in html_cat
+    assert "iPhone 15 Pro" not in html_cat
+
+    # 2. Filter by brand name
+    res_brand = client.get('/products?brand=ASUS+ROG')
+    assert res_brand.status_code == 200
+    html_brand = res_brand.data.decode('utf-8')
+    assert "ASUS ROG Zephyrus G16" in html_brand
+    assert "ThinkPad X1 Carbon" not in html_brand
+
+    # 3. Filter by search query (q)
+    res_search = client.get('/products?q=Zephyrus')
+    assert res_search.status_code == 200
+    html_search = res_search.data.decode('utf-8')
+    assert "ASUS ROG" in html_search
+    assert '<mark class="search-highlight">Zephyrus</mark>' in html_search
+
+    # 4. CRITICAL ACCEPTANCE TEST: Searching with XSS payload
+    res_xss = client.get('/products?q=<script>alert(1)</script>')
+    assert res_xss.status_code == 200
+    html_xss = res_xss.data.decode('utf-8')
+
+    # MUST NOT output raw executable <script>alert(1)</script>
+    assert "<script>alert(1)</script>" not in html_xss
+    # Properly escaped in value attributes or text
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html_xss or 'value="&lt;script&gt;alert(1)&lt;/script&gt;"' in html_xss or '&#039;' in html_xss or '&quot;' in html_xss
+
+
+def test_api_products_with_category_brand_and_search(client, sample_catalog):
+    """
+    Test GET /api/products filtering by category, brand, and q.
+    """
+    with client.application.app_context():
+        lenovo = stock_service.create_brand(name="Lenovo", slug="lenovo")
+        tp = stock_service.get_product_by_id(sample_catalog["prod1_id"])
+        stock_service.update_product(tp.id, brand_id=lenovo.id)
+
+    # 1. Filter by category
+    res_cat = client.get('/api/products?category=laptops')
+    assert res_cat.status_code == 200
+    data_cat = res_cat.get_json()
+    assert data_cat["success"] is True
+    assert any(p["name"] == "ThinkPad X1 Carbon" for p in data_cat["data"])
+    assert not any(p["name"] == "iPhone 15 Pro" for p in data_cat["data"])
+
+    # 2. Filter by brand
+    res_brand = client.get('/api/products?brand=lenovo')
+    assert res_brand.status_code == 200
+    data_brand = res_brand.get_json()
+    assert data_brand["success"] is True
+    assert all("ThinkPad" in p["name"] for p in data_brand["data"])
+
+    # 3. Filter by search
+    res_search = client.get('/api/products?q=iPhone')
+    assert res_search.status_code == 200
+    data_search = res_search.get_json()
+    assert data_search["success"] is True
+    assert any("iPhone 15 Pro" in p["name"] for p in data_search["data"])
+
+
+
 
 
 

@@ -100,11 +100,7 @@
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-xl bg-paper border border-border overflow-hidden shrink-0 flex items-center justify-center p-1">
                     {% if brand.logo %}
-                      {% if brand.logo.startswith('http') %}
-                        <img src="{{ brand.logo }}" alt="{{ brand.name }}" class="w-full h-full object-contain"/>
-                      {% else %}
-                        <img src="{{ url_for('static', filename=brand.logo) }}" alt="{{ brand.name }}" class="w-full h-full object-contain"/>
-                      {% endif %}
+                      <img src="{{ brand.logo }}" alt="{{ brand.name }}" class="w-full h-full object-contain" onerror="this.src='/static/images/no-image.jpg'"/>
                     {% else %}
                       <i class="bi bi-patch-check text-text-muted text-lg"></i>
                     {% endif %}
@@ -199,3 +195,4 @@
   </div>
 </div>
 {% endblock %}
+

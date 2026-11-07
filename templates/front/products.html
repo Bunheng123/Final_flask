@@ -2,100 +2,227 @@
 <html lang="en">
   <head>
     {% include 'front/share/header.html' %}
+    <style>
+      .search-highlight {
+        background-color: rgba(245, 158, 11, 0.35);
+        color: #fde047;
+        padding: 0.08em 0.3em;
+        border-radius: 0.25rem;
+        font-weight: 700;
+        border: 1px solid rgba(245, 158, 11, 0.5);
+      }
+      .filter-pill.active {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+      }
+    </style>
   </head>
-  <body class="bg-slate-900 text-white">
+  <body class="bg-slate-900 text-white min-h-screen">
     <!-- Navbar -->
     {% include 'front/share/navbar.html' %}
 
-    <!-- Categories -->
-    <!-- <div class="max-w-7xl mx-auto px-6 mt-12">
-      <h2 class="text-2xl font-bold mb-6">Categories</h2>
+    <div class="max-w-7xl mx-auto px-6 mt-8 mb-16">
+      <!-- Title & Search Control Header -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
+        <div>
+          <h2 class="text-3xl font-extrabold text-white tracking-tight">Explore Products</h2>
+          <p class="text-slate-400 text-sm mt-1">
+            Browse our top hardware lineup with real-time instant search & taxonomy filters.
+          </p>
+        </div>
 
-      <div class="grid md:grid-cols-4 gap-6">
-        <div class="bg-slate-800 p-6 text-center rounded-xl hover:bg-slate-700">
-          Laptops
-        </div>
-        <div class="bg-slate-800 p-6 text-center rounded-xl hover:bg-slate-700">
-          Keyboards
-        </div>
-        <div class="bg-slate-800 p-6 text-center rounded-xl hover:bg-slate-700">
-          Monitors
-        </div>
-        <div class="bg-slate-800 p-6 text-center rounded-xl hover:bg-slate-700">
-          Accessories
+        <!-- Real-Time Instant Search Input -->
+        <div class="relative w-full md:w-96">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+          <form method="GET" action="{{ url_for('front_bp.products') }}" id="searchForm" onsubmit="event.preventDefault(); applyLiveFilters();">
+            <input
+              type="search"
+              id="liveSearchInput"
+              name="q"
+              value="{{ q }}"
+              placeholder="Instant search products, specs, brands..."
+              autocomplete="off"
+              class="w-full pl-10 pr-10 py-3 bg-slate-800/80 border border-slate-700/80 rounded-2xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition shadow-inner"
+            />
+          </form>
+          <button
+            type="button"
+            id="clearSearchBtn"
+            class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white transition {% if not q %}hidden{% endif %}"
+            title="Clear search"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
       </div>
-    </div> -->
 
-    <!-- Products -->
-    <div class="max-w-7xl mx-auto px-6 mt-12">
-      <h2 class="text-2xl font-bold mb-6">Featured Products</h2>
+      <!-- Filters Section -->
+      <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-6 mb-10 backdrop-blur-sm space-y-5">
+        <!-- Categories Filter -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <span class="text-xs uppercase tracking-wider text-slate-400 font-bold shrink-0 w-24">Category:</span>
+          <div class="flex flex-wrap items-center gap-2" id="categoryFilterContainer">
+            <button
+              type="button"
+              class="filter-pill category-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if not selected_category %}active{% endif %}"
+              data-category=""
+            >
+              All Categories
+            </button>
+            {% for cat in categories %}
+              <button
+                type="button"
+                class="filter-pill category-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if selected_category|string == cat.name|string or selected_category|string == cat.slug|string or selected_category|string == cat.id|string %}active{% endif %}"
+                data-category="{{ cat.name }}"
+                data-category-slug="{{ cat.slug }}"
+                data-category-id="{{ cat.id }}"
+              >
+                {{ cat.name }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7">
+        <!-- Brands Filter -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800/80">
+          <span class="text-xs uppercase tracking-wider text-slate-400 font-bold shrink-0 w-24">Brand:</span>
+          <div class="flex flex-wrap items-center gap-2" id="brandFilterContainer">
+            <button
+              type="button"
+              class="filter-pill brand-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if not selected_brand %}active{% endif %}"
+              data-brand=""
+            >
+              All Brands
+            </button>
+            {% for b in brands %}
+              <button
+                type="button"
+                class="filter-pill brand-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if selected_brand|string == b.name|string or selected_brand|string == b.slug|string or selected_brand|string == b.id|string %}active{% endif %}"
+                data-brand="{{ b.name }}"
+                data-brand-slug="{{ b.slug }}"
+                data-brand-id="{{ b.id }}"
+              >
+                {{ b.name }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Results Counter -->
+      <div class="flex items-center justify-between mb-6">
+        <span class="text-xs font-medium text-slate-400" id="resultsCount">
+          Showing <span class="font-bold text-white" id="visibleProductsCount">{{ products|length }}</span> item(s)
+        </span>
+        <button
+          type="button"
+          id="resetAllFiltersBtn"
+          class="text-xs text-blue-400 hover:text-blue-300 underline font-semibold transition {% if not q and not selected_category and not selected_brand %}hidden{% endif %}"
+        >
+          Reset all filters
+        </button>
+      </div>
+
+      <!-- Products Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7" id="productsGrid">
         {% for product in products %}
         <div
-          class="group relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900 transition-all duration-500"
+          class="product-card group relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900 transition-all duration-500 flex flex-col justify-between"
+          data-product-id="{{ product.id }}"
+          data-name="{{ product.name }}"
+          data-description="{{ product.description or '' }}"
+          data-category="{{ product.category.name if product.category and product.category.name is defined else (product.category or '') }}"
+          data-category-slug="{{ product.category.slug if product.category and product.category.slug is defined else '' }}"
+          data-category-id="{{ product.category_id if product.category_id is defined else '' }}"
+          data-brand="{{ product.brand.name if product.brand else '' }}"
+          data-brand-slug="{{ product.brand.slug if product.brand else '' }}"
+          data-brand-id="{{ product.brand_id if product.brand_id is defined else '' }}"
         >
-          <!-- Image -->
+          <!-- Image Container -->
           <a
             href="{{ url_for('front_bp.product', product_id=product.id) }}"
-            class="relative overflow-hidden block"
+            class="relative overflow-hidden block aspect-[4/3] bg-slate-800"
           >
-            <img
-              src="{{ product.image }}"
-              class="w-full h-64 object-cover group-hover:scale-110 transition duration-700"
-            />
+            {% if product.image %}
+              <img
+                src="{{ product.image }}"
+                alt="{{ product.name }}"
+                class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+                onerror="this.src='/static/images/no-image.jpg'"
+              />
+            {% else %}
+              <div class="w-full h-full flex items-center justify-center text-slate-600">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+              </div>
+            {% endif %}
 
-            <!-- Overlay -->
-            <div
-              class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"
-            ></div>
+            <!-- Overlay Gradient -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-            <!-- Category -->
-            <span
-              class="absolute top-4 left-4 bg-white/10 backdrop-blur-lg border border-white/10 text-white text-xs px-4 py-1.5 rounded-full"
-            >
-              {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
-            </span>
+            <!-- Category & Brand Badges -->
+            <div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+              <span class="bg-white/10 backdrop-blur-lg border border-white/10 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
+                {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
+              </span>
+
+              {% if product.brand %}
+                <span class="bg-violet-500/25 backdrop-blur-lg border border-violet-400/30 text-violet-200 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                  {{ product.brand.name }}
+                </span>
+              {% endif %}
+            </div>
           </a>
 
-          <!-- Content -->
-          <div class="p-5 flex flex-col">
+          <!-- Content Body -->
+          <div class="p-5 flex flex-col flex-1 justify-between">
             <a
               href="{{ url_for('front_bp.product', product_id=product.id) }}"
               class="block"
             >
-              <!-- Product Name -->
-              <h3
-                class="text-white text-lg font-semibold line-clamp-1 group-hover:text-blue-400 transition text-center"
-              >
-                {{ product.name }}
+              <!-- Product Name with XSS-safe highlight -->
+              <h3 class="product-name text-white text-base font-semibold line-clamp-1 group-hover:text-blue-400 transition text-center">
+                {{ product.name | highlight_query(q) }}
               </h3>
 
-              <!-- Description -->
-              <p
-                class="text-slate-400 text-sm leading-6 mt-3 line-clamp-2 min-h-[72px] text-center"
-              >
-                {{ product.description }}
+              <!-- Description with XSS-safe highlight -->
+              <p class="product-description text-slate-400 text-xs leading-5 mt-2.5 line-clamp-2 min-h-[40px] text-center">
+                {{ (product.description or '') | highlight_query(q) }}
               </p>
             </a>
 
-            <!-- Bottom -->
-            <div class="mt-6 flex items-center justify-between">
-              <!-- Price -->
+            <!-- Bottom Price & Cart Action -->
+            <div class="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
               <div>
-                <p class="text-slate-500 text-xs uppercase tracking-wide">
+                <p class="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
                   Price
                 </p>
-
-                <p class="text-2xl font-bold text-white">
+                <p class="text-xl font-bold text-white">
                   {% if product.price_formatted %}{{ product.price_formatted }}{% else %}${{ product.price }}{% endif %}
                 </p>
               </div>
 
-              <!-- Add Button (link-based: will load/redirect) -->
               <a href="{{ url_for('front_bp.cart') }}?product_id={{ product.id }}">
-                <button class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition shadow-lg shadow-blue-500/20">
+                <button
+                  type="button"
+                  class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-500/25 active:scale-95"
+                >
                   Add Cart
                 </button>
               </a>
@@ -105,8 +232,221 @@
         {% endfor %}
       </div>
 
+      <!-- No Results State -->
+      <div id="noResultsState" class="hidden py-16 text-center border border-slate-800/80 rounded-3xl bg-slate-800/20 mt-6">
+        <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4 text-slate-400">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-1">No products found</h3>
+        <p class="text-sm text-slate-400 max-w-md mx-auto mb-5">
+          We couldn't find any products matching your search criteria. Try a different keyword, category, or brand.
+        </p>
+        <button
+          type="button"
+          onclick="resetAllFilters();"
+          class="px-5 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold transition shadow-md"
+        >
+          Clear All Filters
+        </button>
+      </div>
+
       <!-- Footer -->
-      {% include ('front/share/footer.html') %}
+      {% include 'front/share/footer.html' %}
     </div>
+
+    <!-- Real-Time Instant Filtering & XSS-Safe Keyword Highlighting Script -->
+    <script>
+      (function() {
+        const searchInput = document.getElementById('liveSearchInput');
+        const clearBtn = document.getElementById('clearSearchBtn');
+        const productsGrid = document.getElementById('productsGrid');
+        const noResults = document.getElementById('noResultsState');
+        const countSpan = document.getElementById('visibleProductsCount');
+        const resetBtn = document.getElementById('resetAllFiltersBtn');
+        const categoryPills = document.querySelectorAll('.category-pill');
+        const brandPills = document.querySelectorAll('.brand-pill');
+
+        let activeCategory = '{{ selected_category or "" }}'.toLowerCase().trim();
+        let activeBrand = '{{ selected_brand or "" }}'.toLowerCase().trim();
+        let debounceTimer = null;
+
+        // XSS-Safe HTML entity sanitizer
+        function escapeHtml(text) {
+          if (!text) return '';
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        }
+
+        // XSS-Safe regex keyword highlighter
+        function highlightText(rawText, query) {
+          const escaped = escapeHtml(rawText);
+          if (!query || !query.trim()) return escaped;
+          const cleanQuery = query.trim();
+          const escapedQuery = escapeHtml(cleanQuery);
+          if (!escapedQuery) return escaped;
+
+          // Escape regex special chars
+          const regexSafe = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp('(' + regexSafe + ')', 'gi');
+          return escaped.replace(regex, '<mark class="search-highlight">$1</mark>');
+        }
+
+        // Real-time filtering function
+        window.applyLiveFilters = function() {
+          const query = (searchInput.value || '').trim().toLowerCase();
+          const cards = productsGrid.querySelectorAll('.product-card');
+          let visibleCount = 0;
+
+          if (query) {
+            clearBtn.classList.remove('hidden');
+          } else {
+            clearBtn.classList.add('hidden');
+          }
+
+          cards.forEach(card => {
+            const name = (card.dataset.name || '');
+            const desc = (card.dataset.description || '');
+            const catName = (card.dataset.category || '').toLowerCase();
+            const catSlug = (card.dataset.categorySlug || '').toLowerCase();
+            const catId = (card.dataset.categoryId || '').toLowerCase();
+            const brandName = (card.dataset.brand || '').toLowerCase();
+            const brandSlug = (card.dataset.brandSlug || '').toLowerCase();
+            const brandId = (card.dataset.brandId || '').toLowerCase();
+
+            // Check Category match
+            let matchesCategory = true;
+            if (activeCategory) {
+              matchesCategory = (
+                catName === activeCategory ||
+                catSlug === activeCategory ||
+                catId === activeCategory
+              );
+            }
+
+            // Check Brand match
+            let matchesBrand = true;
+            if (activeBrand) {
+              matchesBrand = (
+                brandName === activeBrand ||
+                brandSlug === activeBrand ||
+                brandId === activeBrand
+              );
+            }
+
+            // Check Search keyword match
+            let matchesSearch = true;
+            if (query) {
+              const fullSearchable = (name + ' ' + desc + ' ' + catName + ' ' + brandName).toLowerCase();
+              matchesSearch = fullSearchable.includes(query);
+            }
+
+            if (matchesCategory && matchesBrand && matchesSearch) {
+              card.style.display = '';
+              visibleCount++;
+
+              // Apply client-side XSS-safe live highlighting
+              const nameEl = card.querySelector('.product-name');
+              const descEl = card.querySelector('.product-description');
+              if (nameEl) nameEl.innerHTML = highlightText(name, query);
+              if (descEl) descEl.innerHTML = highlightText(desc, query);
+            } else {
+              card.style.display = 'none';
+            }
+          });
+
+          // Update count indicator
+          if (countSpan) countSpan.textContent = visibleCount;
+
+          // Toggle empty state
+          if (visibleCount === 0) {
+            noResults.classList.remove('hidden');
+            productsGrid.classList.add('hidden');
+          } else {
+            noResults.classList.add('hidden');
+            productsGrid.classList.remove('hidden');
+          }
+
+          // Show/hide reset button
+          if (resetBtn) {
+            if (query || activeCategory || activeBrand) {
+              resetBtn.classList.remove('hidden');
+            } else {
+              resetBtn.classList.add('hidden');
+            }
+          }
+
+          // Synchronize URL in browser history without full page reload
+          const params = new URLSearchParams();
+          if (query) params.set('q', query);
+          if (activeCategory) params.set('category', activeCategory);
+          if (activeBrand) params.set('brand', activeBrand);
+          const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+          window.history.replaceState({}, '', newUrl);
+        };
+
+        // Real-time debounced input on search box (instant typing experience)
+        searchInput.addEventListener('input', function() {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(applyLiveFilters, 60);
+        });
+
+        clearBtn.addEventListener('click', function() {
+          searchInput.value = '';
+          searchInput.focus();
+          applyLiveFilters();
+        });
+
+        // Category pills click handler
+        categoryPills.forEach(pill => {
+          pill.addEventListener('click', function() {
+            categoryPills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            activeCategory = (this.dataset.categorySlug || this.dataset.category || '').toLowerCase().trim();
+            applyLiveFilters();
+          });
+        });
+
+        // Brand pills click handler
+        brandPills.forEach(pill => {
+          pill.addEventListener('click', function() {
+            brandPills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            activeBrand = (this.dataset.brandSlug || this.dataset.brand || '').toLowerCase().trim();
+            applyLiveFilters();
+          });
+        });
+
+        // Reset all filters function
+        window.resetAllFilters = function() {
+          searchInput.value = '';
+          activeCategory = '';
+          activeBrand = '';
+
+          categoryPills.forEach(p => {
+            if (!p.dataset.category) p.classList.add('active');
+            else p.classList.remove('active');
+          });
+
+          brandPills.forEach(p => {
+            if (!p.dataset.brand) p.classList.add('active');
+            else p.classList.remove('active');
+          });
+
+          applyLiveFilters();
+        };
+
+        if (resetBtn) {
+          resetBtn.addEventListener('click', resetAllFilters);
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -5,26 +5,56 @@ Owner: Workstream A / Member 2 (Catalog & Product Variants)
 from flask import render_template, abort, request
 from front import front_bp
 from services import stock_service
+from helpers.highlight import highlight_query
+
+
+@front_bp.app_template_filter('highlight_query')
+def highlight_query_filter(value, query=""):
+    """Jinja2 filter to safely highlight matched search queries."""
+    return highlight_query(value, query)
+
+
+@front_bp.app_context_processor
+def inject_highlight_helper():
+    """Inject highlight_query into template context for direct function call syntax."""
+    return {'highlight_query': highlight_query}
 
 
 @front_bp.get('/products', endpoint='products')
 def all_products():
     """
     Storefront product listing view.
-    Delegates querying to stock_service and supports optional category and search filters.
+    Delegates querying to stock_service and supports category, brand, and live search filters.
     """
     module = 'products'
-    category_id = request.args.get('category_id')
+    category = request.args.get('category') or request.args.get('category_id')
+    brand = request.args.get('brand') or request.args.get('brand_id')
     search = request.args.get('q') or request.args.get('search')
-    cat_id_int = int(category_id) if category_id and category_id.isdigit() else None
 
-    products_list = stock_service.get_active_products(category_id=cat_id_int, search=search)
-    if not products_list and not cat_id_int and not search:
+    products_list = stock_service.get_active_products(
+        category=category,
+        brand=brand,
+        search=search
+    )
+    categories = stock_service.get_all_categories()
+    brands = stock_service.get_all_brands()
+
+    if not products_list and not category and not brand and not search:
         # Fallback to mock catalog if database has not been seeded
         from product import products as mock_products
         products_list = mock_products
 
-    return render_template("front/products.html", products=products_list, module=module)
+    return render_template(
+        "front/products.html",
+        products=products_list,
+        categories=categories,
+        brands=brands,
+        selected_category=category or "",
+        selected_brand=brand or "",
+        search_query=search or "",
+        q=search or "",
+        module=module
+    )
 
 
 @front_bp.get('/product/<int:product_id>', endpoint='product')

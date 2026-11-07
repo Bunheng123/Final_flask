@@ -21,3 +21,4 @@ class Brand(db.Model):
 
     def __repr__(self):
         return f"<Brand {self.id}: {self.name}>"
+
