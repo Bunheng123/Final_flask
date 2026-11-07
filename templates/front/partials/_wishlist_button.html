@@ -1,3 +1,78 @@
-{# Owner: Workstream B / M5 (User Accounts, Wishlist & Reviews) #}
-<!-- Wishlist Button Partial (Stub) -->
+{# Owner: Developer 5 (Customer Portal, Social Commerce & API Security) #}
+{% set prod_id = product.id if product is defined and product else 0 %}
+{% set in_wishlist = false %}
+{% if session.get('is_login') and session.get('user_id') and WishlistItem is defined and prod_id %}
+  {% set existing = WishlistItem.query.filter_by(user_id=session.get('user_id'), product_id=prod_id).first() %}
+  {% if existing %}{% set in_wishlist = true %}{% endif %}
+{% endif %}
 
+<button
+  type="button"
+  id="wishlistToggleBtn-{{ prod_id }}"
+  onclick="toggleWishlist({{ prod_id }})"
+  class="w-full py-3 px-5 rounded-2xl border transition-all duration-300 flex items-center justify-center gap-2 text-sm font-semibold shadow-sm {% if in_wishlist %}bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20{% else %}bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-600 hover:text-white hover:bg-slate-800{% endif %}"
+>
+  <svg
+    id="wishlistIcon-{{ prod_id }}"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="{% if in_wishlist %}currentColor{% else %}none{% endif %}"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    class="transition-transform duration-300 {% if in_wishlist %}text-rose-500 scale-110{% endif %}"
+  >
+    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+  </svg>
+  <span id="wishlistText-{{ prod_id }}">
+    {% if in_wishlist %}Saved in Wishlist{% else %}Add to Wishlist{% endif %}
+  </span>
+</button>
+
+<script>
+function toggleWishlist(productId) {
+  const btn = document.getElementById('wishlistToggleBtn-' + productId);
+  const icon = document.getElementById('wishlistIcon-' + productId);
+  const text = document.getElementById('wishlistText-' + productId);
+
+  fetch('/wishlist/toggle/' + productId, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token() }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({})
+  })
+  .then(response => {
+    if (response.status === 401) {
+      window.location.href = "{{ url_for('front_bp.login') }}?next=" + encodeURIComponent(window.location.pathname);
+      return null;
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (!data) return;
+    if (data.success) {
+      if (data.in_wishlist) {
+        btn.className = "w-full py-3 px-5 rounded-2xl border transition-all duration-300 flex items-center justify-center gap-2 text-sm font-semibold shadow-sm bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20";
+        icon.setAttribute("fill", "currentColor");
+        icon.classList.add("text-rose-500", "scale-110");
+        text.innerText = "Saved in Wishlist";
+      } else {
+        btn.className = "w-full py-3 px-5 rounded-2xl border transition-all duration-300 flex items-center justify-center gap-2 text-sm font-semibold shadow-sm bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-600 hover:text-white hover:bg-slate-800";
+        icon.setAttribute("fill", "none");
+        icon.classList.remove("text-rose-500", "scale-110");
+        text.innerText = "Add to Wishlist";
+      }
+    } else {
+      alert(data.error || "Could not update wishlist.");
+    }
+  })
+  .catch(err => {
+    console.error("Wishlist error:", err);
+  });
+}
+</script>

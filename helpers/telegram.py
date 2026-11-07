@@ -159,8 +159,13 @@ def _send_alert_worker(ip, method, path, limit_desc, retry_after, user_agent):
         # First alert or cooldown expired
         _recent_alerts[ip] = {'timestamp': now, 'count': 1}
 
+<<<<<<< HEAD
     bot_token = os.environ.get("TELEGRAM_ALERT_BOT_TOKEN") or TELEGRAM_ALERT_BOT_TOKEN
     chat_id = os.environ.get("TELEGRAM_ALERT_CHAT_ID") or TELEGRAM_ALERT_CHAT_ID
+=======
+    bot_token = TELEGRAM_ALERT_BOT_TOKEN or TELEGRAM_BOT_TOKEN
+    chat_id = TELEGRAM_ALERT_CHAT_ID or TELEGRAM_CHAT_ID
+>>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
 
     if not bot_token or not chat_id:
         return

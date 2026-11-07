@@ -34,5 +34,5 @@ def require_admin_login():
     if session.get('role') != 'admin' and session.get('user_role') != 'admin':
         abort(403)
 
-from admin import dashboard, user, auth, block_log, products, orders, coupons, reports, variants, reviews
+from admin import dashboard, user, auth, block_log, products, orders, coupons, reports, variants, reviews, brand
 

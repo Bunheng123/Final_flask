@@ -18,6 +18,7 @@
             <img
               id="mainImage"
               src="{{ product.image }}"
+              alt="{{ product.name }}"
               class="w-full h-[600px] object-cover group-hover:scale-105 transition duration-700"
             />
           </div>
@@ -27,7 +28,7 @@
             <span
               class="bg-blue-500/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-full text-sm backdrop-blur-lg"
             >
-              {{ product.category }}
+              {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
             </span>
           </div>
         </div>
@@ -49,16 +50,16 @@
           <!-- Star Ratings Partial -->
           {% include 'front/partials/_rating_stars.html' ignore missing %}
 
-          <!-- Price -->
+          <!-- Price & Stock Status -->
           <div class="mt-6 flex items-center gap-4">
-            <span class="text-5xl font-bold text-white">
-              ${{ product.price }}
+            <span id="displayPrice" class="text-5xl font-bold text-white">
+              {% if product.price_formatted %}{{ product.price_formatted }}{% else %}${{ product.price }}{% endif %}
             </span>
 
-            <span
-              class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm"
+            <span id="displayStockBadge"
+              class="{% if product.in_stock is not defined or product.in_stock %}bg-green-500/20 text-green-400{% else %}bg-red-500/20 text-red-400{% endif %} px-3 py-1 rounded-full text-sm font-semibold"
             >
-              In Stock
+              {% if product.in_stock is not defined or product.in_stock %}In Stock{% else %}Out of Stock{% endif %}
             </span>
           </div>
 
@@ -67,44 +68,110 @@
             {{ product.description }}
           </p>
 
-          <!-- Features -->
+          <!-- Specifications Snapshot -->
           <div class="grid grid-cols-2 gap-4 mt-8">
             <div class="bg-slate-900 rounded-2xl p-4 border border-slate-700">
               <p class="text-slate-500 text-sm">Category</p>
-              <p class="font-semibold mt-1">{{ product.category }}</p>
+              <p class="font-semibold mt-1">{{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}</p>
             </div>
 
             <div class="bg-slate-900 rounded-2xl p-4 border border-slate-700">
-              <p class="text-slate-500 text-sm">Availability</p>
-              <p class="font-semibold mt-1 text-green-400">Ready Stock</p>
+              <p class="text-slate-500 text-sm">Active SKU</p>
+              <p id="displaySku" class="font-semibold mt-1 text-blue-400">
+                {{ product.default_variant.sku if product.default_variant else (variants[0].sku if variants and variants|length > 0 else 'DEFAULT') }}
+              </p>
             </div>
           </div>
 
+          <!-- Variant Selector & Add to Cart Form -->
+          <form action="{{ url_for('front_bp.cart') }}" method="GET" class="mt-8 space-y-6" id="productAddToCartForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="product_id" value="{{ product.id }}"/>
 
+            {% if variants and variants|length > 0 %}
+            <div>
+              <label class="block text-sm font-semibold uppercase tracking-wider text-slate-300 mb-3">
+                Select Specification / Variant:
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="variantSelectorGroup">
+                {% for v in variants %}
+                <label class="cursor-pointer border {% if loop.first %}border-blue-500 bg-blue-500/10{% else %}border-slate-700 bg-slate-900{% endif %} rounded-2xl p-4 flex flex-col justify-between hover:border-blue-400 transition relative variant-card">
+                  <div class="flex items-start justify-between">
+                    <span class="font-semibold text-white text-sm">{{ v.spec_name }}</span>
+                    <input type="radio" name="variant_id" value="{{ v.id }}" {% if loop.first %}checked{% endif %}
+                      class="accent-blue-500 variant-radio"
+                      data-price="{{ v.price_formatted or ('$' ~ v.price) }}"
+                      data-stock="{{ v.stock }}"
+                      data-sku="{{ v.sku }}"
+                      onchange="onVariantSelected(this)"
+                    />
+                  </div>
+                  <div class="mt-3 flex items-center justify-between text-xs">
+                    <span class="text-blue-400 font-bold text-base">{{ v.price_formatted or ('$' ~ v.price) }}</span>
+                    {% if v.stock > 0 %}
+                    <span class="bg-green-500/20 text-green-400 px-2.5 py-0.5 rounded-full font-medium">In Stock ({{ v.stock }})</span>
+                    {% else %}
+                    <span class="bg-red-500/20 text-red-400 px-2.5 py-0.5 rounded-full font-medium">Out of Stock</span>
+                    {% endif %}
+                  </div>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            {% else %}
+            <input type="hidden" name="variant_id" value="{{ product.default_variant.id if product.default_variant else '' }}"/>
+            {% endif %}
 
-          <!-- Buttons -->
-         <div class="grid sm:grid-cols-2 gap-4 mt-10">
+            <!-- Quantity & Actions -->
+            <div class="flex items-end gap-4">
+              <div>
+                <label class="block text-xs uppercase text-slate-400 mb-1.5 font-semibold">Quantity</label>
+                <div class="flex items-center bg-slate-900 border border-slate-700 rounded-2xl h-14 px-2">
+                  <button
+                    type="button"
+                    id="qtyMinusBtn"
+                    onclick="stepQty(-1)"
+                    class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                    aria-label="Decrease quantity"
+                  >
+                    &minus;
+                  </button>
+                  <input
+                    type="number"
+                    name="qty"
+                    id="productQtyInput"
+                    value="1"
+                    min="1"
+                    readonly
+                    class="w-14 bg-transparent text-white text-center font-bold text-lg focus:outline-none select-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <button
+                    type="button"
+                    id="qtyPlusBtn"
+                    onclick="stepQty(1)"
+                    class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg transition disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                    aria-label="Increase quantity"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
 
-            <a
-              href="{{ url_for('front_bp.cart') }}?product_id={{ product.id }}"
-              class="h-14 flex items-center justify-center rounded-2xl bg-blue-500 hover:bg-blue-600 font-semibold transition shadow-lg shadow-blue-500/30 w-full"
-            >
-              Add To Cart
-            </a>
-
-            <a
-              href="#"
-              class="h-14 flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-600 font-semibold transition shadow-lg shadow-emerald-500/30 w-full"
-            >
-              Buy Now
-            </a>
-
-          </div>
+              <div class="flex-1">
+                <button
+                  type="submit"
+                  id="addToCartBtn"
+                  class="h-14 flex items-center justify-center rounded-2xl bg-blue-500 hover:bg-blue-600 font-semibold transition shadow-lg shadow-blue-500/30 w-full text-white text-base"
+                >
+                  Add To Cart
+                </button>
+              </div>
+            </div>
+          </form>
 
           <!-- Wishlist Button Partial -->
-          <div class="mt-4">
+          <div class="mt-6">
             {% include 'front/partials/_wishlist_button.html' ignore missing %}
-          </div>
           </div>
         </div>
       </div>
@@ -139,27 +206,18 @@
 
       <!-- Grid -->
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {% for product in related_product %}
-
+        {% for rel in related_product %}
         <div
           class="group relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900 hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-2"
         >
-          <!-- Glow -->
-          <div
-            class="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500"
-          >
-            <div
-              class="absolute bottom-0 left-1/2 -translate-x-1/2 w-64 h-40 bg-blue-500/20 blur-3xl"
-            ></div>
-          </div>
-
           <!-- Image -->
           <a
-            href="{{ url_for('front_bp.product', product_id=product.id) }}"
+            href="{{ url_for('front_bp.product', product_id=rel.id) }}"
             class="relative overflow-hidden block"
           >
             <img
-              src="{{ product.image }}"
+              src="{{ rel.image }}"
+              alt="{{ rel.name }}"
               class="w-full h-64 object-cover group-hover:scale-110 transition duration-700"
             />
 
@@ -172,51 +230,39 @@
             <span
               class="absolute top-4 left-4 bg-white/10 backdrop-blur-lg border border-white/10 text-white text-xs px-4 py-1.5 rounded-full"
             >
-              {{ product.category }}
+              {{ rel.category.name if rel.category and rel.category.name is defined else (rel.category or 'General') }}
             </span>
-
-            <!-- Quick Button -->
-            <button
-              class="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white opacity-0 group-hover:opacity-100 transition pointer-events-none"
-            >
-              +
-            </button>
           </a>
 
           <!-- Content -->
           <div class="p-5 flex flex-col">
-            <!-- Product -->
-            <a href="{{ url_for('front_bp.product', product_id=product.id) }}">
+            <a href="{{ url_for('front_bp.product', product_id=rel.id) }}">
               <h3
                 class="text-white text-lg font-semibold line-clamp-1 group-hover:text-blue-400 transition text-center"
               >
-                {{ product.name }}
+                {{ rel.name }}
               </h3>
             </a>
 
-            <!-- Description -->
             <p
               class="text-slate-400 text-sm leading-6 mt-3 line-clamp-2 min-h-[72px] text-center"
             >
-              {{ product.description }}
+              {{ rel.description }}
             </p>
 
-            <!-- Bottom -->
             <div class="mt-6 flex items-center justify-between">
-              <!-- Price -->
               <div>
                 <p class="text-slate-500 text-xs uppercase tracking-wide">
                   Price
                 </p>
 
                 <p class="text-2xl font-bold text-white">
-                  ${{ product.price }}
+                  {% if rel.price_formatted %}{{ rel.price_formatted }}{% else %}${{ rel.price }}{% endif %}
                 </p>
               </div>
 
-              <!-- Add Button (link-based: will load/redirect) -->
               <a
-                href="{{ url_for('front_bp.cart') }}?product_id={{ product.id }}"
+                href="{{ url_for('front_bp.cart') }}?product_id={{ rel.id }}"
               >
                 <button
                   class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition shadow-lg shadow-blue-500/20"
@@ -227,10 +273,148 @@
             </div>
           </div>
         </div>
-
         {% endfor %}
       </div>
     </div>
+
+    <!-- Variant Selection & Quantity Stepper Script -->
+    <script>
+      function getCurrentStock() {
+        var selected = document.querySelector('input.variant-radio:checked');
+        if (selected) {
+          return parseInt(selected.getAttribute('data-stock') || '0', 10);
+        }
+        var badge = document.getElementById('displayStockBadge');
+        if (badge && badge.textContent.indexOf('Out of Stock') !== -1) {
+          return 0;
+        }
+        return 999;
+      }
+
+      function updateQtyButtonsState() {
+        var input = document.getElementById('productQtyInput');
+        var minusBtn = document.getElementById('qtyMinusBtn');
+        var plusBtn = document.getElementById('qtyPlusBtn');
+        if (!input) return;
+
+        var stock = getCurrentStock();
+        var val = parseInt(input.value || '1', 10);
+
+        if (stock <= 0) {
+          input.value = '0';
+          if (minusBtn) minusBtn.disabled = true;
+          if (plusBtn) plusBtn.disabled = true;
+          return;
+        }
+
+        if (val <= 1) {
+          if (minusBtn) minusBtn.disabled = true;
+        } else {
+          if (minusBtn) minusBtn.disabled = false;
+        }
+
+        if (val >= stock) {
+          if (plusBtn) plusBtn.disabled = true;
+        } else {
+          if (plusBtn) plusBtn.disabled = false;
+        }
+      }
+
+      function stepQty(delta) {
+        var input = document.getElementById('productQtyInput');
+        if (!input) return;
+
+        var stock = getCurrentStock();
+        if (stock <= 0) {
+          input.value = '0';
+          updateQtyButtonsState();
+          return;
+        }
+
+        var current = parseInt(input.value || '1', 10);
+        if (isNaN(current) || current < 1) current = 1;
+
+        var next = current + delta;
+        if (next < 1) next = 1;
+        if (next > stock) next = stock;
+
+        input.value = next;
+        updateQtyButtonsState();
+      }
+
+      function onVariantSelected(radio) {
+        var price = radio.getAttribute('data-price');
+        var stock = parseInt(radio.getAttribute('data-stock') || '0', 10);
+        var sku = radio.getAttribute('data-sku');
+
+        if (price) {
+          var priceEl = document.getElementById('displayPrice');
+          if (priceEl) priceEl.textContent = price;
+        }
+        if (sku) {
+          var skuEl = document.getElementById('displaySku');
+          if (skuEl) skuEl.textContent = sku;
+        }
+
+        var badge = document.getElementById('displayStockBadge');
+        var btn = document.getElementById('addToCartBtn');
+        var input = document.getElementById('productQtyInput');
+
+        if (stock > 0) {
+          if (badge) {
+            badge.className = 'bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-semibold';
+            badge.textContent = 'In Stock (' + stock + ')';
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.className = 'h-14 flex items-center justify-center rounded-2xl bg-blue-500 hover:bg-blue-600 font-semibold transition shadow-lg shadow-blue-500/30 w-full text-white text-base';
+            btn.textContent = 'Add To Cart';
+          }
+          if (input) {
+            var curQty = parseInt(input.value || '1', 10);
+            if (curQty < 1) curQty = 1;
+            if (curQty > stock) curQty = stock;
+            input.value = curQty;
+          }
+        } else {
+          if (badge) {
+            badge.className = 'bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-semibold';
+            badge.textContent = 'Out of Stock';
+          }
+          if (btn) {
+            btn.disabled = true;
+            btn.className = 'h-14 flex items-center justify-center rounded-2xl bg-slate-700 text-slate-400 font-semibold cursor-not-allowed w-full text-base';
+            btn.textContent = 'Out of Stock';
+          }
+          if (input) {
+            input.value = '0';
+          }
+        }
+
+        updateQtyButtonsState();
+
+        // Highlight selected variant card border
+        document.querySelectorAll('.variant-card').forEach(function(card) {
+          card.classList.remove('border-blue-500', 'bg-blue-500/10');
+          card.classList.add('border-slate-700', 'bg-slate-900');
+        });
+        var parentCard = radio.closest('.variant-card');
+        if (parentCard) {
+          parentCard.classList.remove('border-slate-700', 'bg-slate-900');
+          parentCard.classList.add('border-blue-500', 'bg-blue-500/10');
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var checked = document.querySelector('input.variant-radio:checked');
+        if (checked) {
+          onVariantSelected(checked);
+        } else {
+          updateQtyButtonsState();
+        }
+      });
+    </script>
+
     <!-- Footer -->
     {% include 'front/share/footer.html' %}
   </body>

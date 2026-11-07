@@ -242,9 +242,9 @@ def test_auth_helpers(app):
 
 def test_new_stubs_501(client):
     """Verify new endpoint stubs return 501 on POST and email service executes without error."""
-    # Coupon preview stub
+    # Coupon preview (implemented by Workstream D / or 501 stub)
     res_coupon = client.post('/coupon/preview')
-    assert res_coupon.status_code == 501
+    assert res_coupon.status_code in (200, 400, 501)
 
     # Admin login for admin variant stubs
     client.post('/login', data={'email': 'admin@techstore.test', 'password': 'password123'})
@@ -264,6 +264,12 @@ def test_new_stubs_501(client):
 
 def test_partials_render_cleanly(client):
     """Verify storefront product detail and checkout templates render partials without Jinja errors."""
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['username'] = 'testuser'
+        sess['email'] = 'testuser@techstore.test'
+
     res_checkout = client.get('/checkout')
     assert res_checkout.status_code == 200
     assert b"TechStore" in res_checkout.data
@@ -271,5 +277,17 @@ def test_partials_render_cleanly(client):
     res_prod = client.get('/product/1')
     assert res_prod.status_code == 200
     assert b"TechStore" in res_prod.data
+
+
+def test_unauthenticated_user_cannot_checkout(client):
+    """Verify unauthenticated user cannot access checkout and cannot place an order."""
+    res_get = client.get('/checkout', follow_redirects=False)
+    assert res_get.status_code in (301, 302)
+    assert '/login' in res_get.headers.get('Location', '')
+
+    res_post = client.post('/checkout', data={'first_name': 'Anonymous'}, follow_redirects=False)
+    assert res_post.status_code in (301, 302)
+    assert '/login' in res_post.headers.get('Location', '')
+
 
 

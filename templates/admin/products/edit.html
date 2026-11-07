@@ -1,0 +1,189 @@
+{% extends 'admin/master.html' %}
+{% block tab_title %}Edit: {{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Header Bar -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center gap-2 text-xs text-text-muted mb-1">
+        <a href="{{ url_for('admin_bp.admin_products') }}" class="hover:text-text transition">Products</a>
+        <i class="bi bi-chevron-right text-[10px]"></i>
+        <span class="text-text font-semibold">{{ product.name }}</span>
+        <i class="bi bi-chevron-right text-[10px]"></i>
+        <span class="text-violet font-semibold">Edit Product</span>
+      </div>
+      <h2 class="font-display text-2xl font-bold text-text">Edit Product: {{ product.name }}</h2>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a
+        href="{{ url_for('admin_bp.admin_product_variants', product_id=product.id) }}"
+        class="border border-border bg-card hover:bg-paper text-text px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+      >
+        <i class="bi bi-sliders"></i> Manage Variants ({{ product.variants|length }})
+      </a>
+      <a
+        href="{{ url_for('admin_bp.admin_products') }}"
+        class="border border-border bg-card hover:bg-paper text-text px-4 py-2 rounded-lg text-xs font-semibold transition"
+      >
+        Back to Products
+      </a>
+    </div>
+  </div>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-6 space-y-2">
+        {% for category, message in messages %}
+          <div class="p-4 rounded-xl text-xs font-semibold flex items-center justify-between {% if category == 'danger' %}bg-red-500/10 text-red-400 border border-red-500/20{% elif category == 'success' %}bg-green-500/10 text-green-400 border border-green-500/20{% else %}bg-blue-500/10 text-blue-400 border border-blue-500/20{% endif %}">
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Edit Product Form -->
+  <form action="{{ url_for('admin_bp.admin_edit_product', product_id=product.id) }}" method="POST" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <div class="bg-card border border-border rounded-2xl p-6 shadow-card">
+      <h3 class="text-base font-bold text-text mb-1 flex items-center gap-2">
+        <i class="bi bi-pencil-square text-violet"></i> Product Details
+      </h3>
+      <p class="text-xs text-text-muted mb-5">
+        Update base catalog attributes, category classification, and storefront presentation.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Product Name -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-text mb-1">
+            Product Name <span class="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            name="name"
+            value="{{ product.name }}"
+            required
+            placeholder="e.g. MacBook Pro 16-inch M3 Max"
+            class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
+          />
+        </div>
+
+        <!-- Category -->
+        <div>
+          <label class="block text-xs font-semibold text-text mb-1">
+            Category <span class="text-red-400">*</span>
+          </label>
+          <select
+            name="category_id"
+            required
+            class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
+          >
+            {% for cat in categories %}
+              <option value="{{ cat.id }}" {% if cat.id == product.category_id %}selected{% endif %}>
+                {{ cat.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Brand -->
+        <div>
+          <label class="block text-xs font-semibold text-text mb-1">
+            Brand (Optional)
+          </label>
+          <select
+            name="brand_id"
+            class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
+          >
+            <option value="">No Brand (Generic / Unbranded)</option>
+            {% for b in brands %}
+              <option value="{{ b.id }}" {% if product.brand_id == b.id %}selected{% endif %}>
+                {{ b.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Status -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-text mb-1">
+            Catalog Status
+          </label>
+          <select
+            name="is_active"
+            class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
+          >
+            <option value="1" {% if product.is_active %}selected{% endif %}>Active (Visible on Storefront)</option>
+            <option value="0" {% if not product.is_active %}selected{% endif %}>Inactive (Hidden)</option>
+          </select>
+        </div>
+
+        <!-- Image URL -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-text mb-1">
+            Image URL
+          </label>
+          <input
+            type="url"
+            name="image"
+            value="{{ product.image or '' }}"
+            placeholder="https://example.com/images/product.jpg"
+            class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
+          />
+        </div>
+
+        <!-- Description -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-text mb-1">
+            Description
+          </label>
+          <textarea
+            name="description"
+            rows="4"
+            placeholder="Detailed features, specifications, and warranty info..."
+            class="w-full border border-border bg-paper rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet"
+          >{{ product.description or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Linked Variants Quick Card -->
+    <div class="bg-card border border-border rounded-2xl p-6 shadow-card flex items-center justify-between">
+      <div>
+        <h4 class="font-bold text-sm text-text">Linked Product Variants</h4>
+        <p class="text-xs text-text-muted mt-0.5">
+          This product has {{ product.variants|length }} variant(s) configuring specs, SKUs, and stock.
+        </p>
+      </div>
+      <a
+        href="{{ url_for('admin_bp.admin_product_variants', product_id=product.id) }}"
+        class="bg-violet hover:bg-[#5b4de8] text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-violet/20"
+      >
+        <i class="bi bi-sliders"></i> Edit Variants & Stock
+      </a>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-end gap-3 pt-2">
+      <a
+        href="{{ url_for('admin_bp.admin_products') }}"
+        class="border border-border bg-paper hover:bg-border text-text px-6 py-2.5 rounded-xl text-xs font-semibold transition"
+      >
+        Cancel
+      </a>
+      <button
+        type="submit"
+        class="bg-violet hover:bg-[#5b4de8] text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition shadow-md shadow-violet/20"
+      >
+        <i class="bi bi-check-lg"></i> Save Changes
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+

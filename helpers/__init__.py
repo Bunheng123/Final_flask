@@ -15,3 +15,4 @@ from helpers.telegram import (
     send_low_stock_alert,
     send_order_alert,
 )
+from helpers.highlight import highlight_query
