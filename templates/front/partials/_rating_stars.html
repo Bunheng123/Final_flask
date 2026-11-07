@@ -1,3 +1,37 @@
-{# Owner: Workstream B / M5 (User Accounts, Wishlist & Reviews) #}
-<!-- Rating Stars Partial (Stub) -->
+{# Owner: Developer 5 (Customer Portal, Social Commerce & API Security) #}
+{% set prod_id = product.id if product is defined and product else 0 %}
+{% if ProductReview is defined and prod_id %}
+  {% set visible_reviews = ProductReview.query.filter_by(product_id=prod_id, is_visible=True).all() %}
+  {% set rev_count = visible_reviews|length %}
+  {% if rev_count > 0 %}
+    {% set total_score = visible_reviews|sum(attribute='rating') %}
+    {% set avg_rating = (total_score / rev_count)|round(1) %}
+  {% else %}
+    {% set avg_rating = 0.0 %}
+  {% endif %}
+{% else %}
+  {% set visible_reviews = [] %}
+  {% set rev_count = 0 %}
+  {% set avg_rating = 0.0 %}
+{% endif %}
 
+<div class="flex items-center gap-2 mt-3">
+  <div class="flex items-center text-amber-400 gap-0.5">
+    {% for i in range(1, 6) %}
+      {% if i <= avg_rating|round(0, 'floor') %}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      {% elif (i - avg_rating) < 1 and (i - avg_rating) > 0 %}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="opacity-70"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      {% else %}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-600"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {% if rev_count > 0 %}
+    <span class="text-sm font-bold text-white ml-1">{{ avg_rating }}</span>
+    <span class="text-xs text-slate-400">({{ rev_count }} review{{ 's' if rev_count != 1 else '' }})</span>
+  {% else %}
+    <span class="text-xs text-slate-400">No reviews yet (Be the first to review!)</span>
+  {% endif %}
+</div>

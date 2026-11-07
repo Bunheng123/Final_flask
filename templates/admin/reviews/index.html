@@ -1,0 +1,171 @@
+{% extends 'admin/master.html' %}
+{% block tab_title %}Customer Reviews{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div>
+    <h2 class="font-display text-2xl font-bold text-text">Customer Reviews Moderation</h2>
+    <p class="text-text-muted text-xs mt-0.5">
+      Review verified customer feedback, manage ratings, and hide or remove inappropriate comments.
+    </p>
+  </div>
+</div>
+
+<!-- Flash alerts -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="mb-6 space-y-2">
+      {% for category, message in messages %}
+        <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between {% if category == 'error' %}bg-rose-500/10 text-rose-500 border border-rose-500/20{% else %}bg-emerald-500/10 text-emerald-600 border border-emerald-500/20{% endif %}">
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- Mini Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+    <div class="w-10 h-10 rounded-xl bg-violet text-white flex items-center justify-center text-lg shrink-0">
+      <i class="bi bi-star-fill"></i>
+    </div>
+    <div class="flex flex-col leading-tight">
+      <span class="font-mono text-xl font-bold text-text">{{ total_count }}</span>
+      <span class="text-xs text-text-muted mt-0.5">Total Reviews</span>
+    </div>
+  </div>
+
+  <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+    <div class="w-10 h-10 rounded-xl bg-teal text-white flex items-center justify-center text-lg shrink-0">
+      <i class="bi bi-check-circle-fill"></i>
+    </div>
+    <div class="flex flex-col leading-tight">
+      <span class="font-mono text-xl font-bold text-text">{{ visible_count }}</span>
+      <span class="text-xs text-text-muted mt-0.5">Published (Visible)</span>
+    </div>
+  </div>
+
+  <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+    <div class="w-10 h-10 rounded-xl bg-amber text-white flex items-center justify-center text-lg shrink-0">
+      <i class="bi bi-eye-slash-fill"></i>
+    </div>
+    <div class="flex flex-col leading-tight">
+      <span class="font-mono text-xl font-bold text-text">{{ hidden_count }}</span>
+      <span class="text-xs text-text-muted mt-0.5">Hidden / Flagged</span>
+    </div>
+  </div>
+</div>
+
+<!-- Table panel -->
+<div class="bg-card border border-border rounded-2xl p-5 shadow-sm">
+  <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-5">
+    <!-- Filter status pills -->
+    <div class="flex items-center gap-2">
+      <a href="{{ url_for('admin_bp.admin_reviews', status='all', q=search_query) }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {% if status_filter == 'all' %}bg-violet text-white{% else %}bg-paper text-text-muted hover:text-text{% endif %}">
+        All ({{ total_count }})
+      </a>
+      <a href="{{ url_for('admin_bp.admin_reviews', status='visible', q=search_query) }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {% if status_filter == 'visible' %}bg-violet text-white{% else %}bg-paper text-text-muted hover:text-text{% endif %}">
+        Visible ({{ visible_count }})
+      </a>
+      <a href="{{ url_for('admin_bp.admin_reviews', status='hidden', q=search_query) }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {% if status_filter == 'hidden' %}bg-violet text-white{% else %}bg-paper text-text-muted hover:text-text{% endif %}">
+        Hidden ({{ hidden_count }})
+      </a>
+    </div>
+
+    <!-- Search box -->
+    <form action="{{ url_for('admin_bp.admin_reviews') }}" method="GET" class="flex items-center gap-2 bg-paper border border-border rounded-lg px-3 py-1.5 text-text-muted focus-within:border-violet transition-colors w-full sm:w-[260px]">
+      <input type="hidden" name="status" value="{{ status_filter }}"/>
+      <i class="bi bi-search text-xs"></i>
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search reviews, users, products…" class="border-none bg-transparent outline-none text-xs text-text w-full"/>
+    </form>
+  </div>
+
+  <div class="w-full overflow-x-auto">
+    <table class="w-full border-collapse">
+      <thead>
+        <tr>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">ID</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">Product</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">Customer</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">Rating</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">Comment</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">Date</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-left border-b border-border px-4 py-3 bg-paper/50">Status</th>
+          <th class="text-[10px] font-bold text-text-muted uppercase tracking-wider text-right border-b border-border px-4 py-3 bg-paper/50">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border text-xs">
+        {% if reviews %}
+          {% for rev in reviews %}
+            <tr class="hover:bg-paper/30 transition">
+              <td class="px-4 py-3.5 font-mono text-text-muted">#{{ rev.id }}</td>
+              <td class="px-4 py-3.5">
+                <div class="font-bold text-text">{{ rev.product.name }}</div>
+                <div class="text-[11px] text-text-muted">Product ID #{{ rev.product_id }}</div>
+              </td>
+              <td class="px-4 py-3.5">
+                <div class="font-semibold text-text">{{ rev.user.username }}</div>
+                <div class="text-[11px] text-text-muted">{{ rev.user.email }}</div>
+              </td>
+              <td class="px-4 py-3.5 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1 font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                  {{ rev.rating }} <i class="bi bi-star-fill text-[10px]"></i>
+                </span>
+              </td>
+              <td class="px-4 py-3.5 max-w-xs">
+                {% if rev.comment %}
+                  <p class="text-text line-clamp-2">{{ rev.comment }}</p>
+                {% else %}
+                  <span class="text-text-muted italic">No comment provided</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3.5 whitespace-nowrap text-text-muted">
+                {% if rev.created_at %}{{ to_local(rev.created_at).strftime('%b %d, %Y') }}{% endif %}
+              </td>
+              <td class="px-4 py-3.5 whitespace-nowrap">
+                {% if rev.is_visible %}
+                  <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 border border-emerald-500/20">
+                    Visible
+                  </span>
+                {% else %}
+                  <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/15 text-rose-500 border border-rose-500/20">
+                    Hidden
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-2">
+                  <!-- Toggle Visibility -->
+                  <form action="{{ url_for('admin_bp.review_toggle_visibility', review_id=rev.id) }}" method="POST" class="inline m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" title="{% if rev.is_visible %}Hide Review{% else %}Publish Review{% endif %}" class="w-7 h-7 rounded-lg border border-border bg-card hover:bg-paper text-text flex items-center justify-center transition">
+                      <i class="bi {% if rev.is_visible %}bi-eye-slash text-amber-600{% else %}bi-eye text-emerald-600{% endif %}"></i>
+                    </button>
+                  </form>
+
+                  <!-- Delete Review -->
+                  <form action="{{ url_for('admin_bp.review_delete', review_id=rev.id) }}" method="POST" onsubmit="return confirm('Permanently delete review #{{ rev.id }}?');" class="inline m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" title="Delete Review" class="w-7 h-7 rounded-lg border border-border bg-card hover:bg-rose-500 hover:text-white hover:border-rose-500 text-rose-500 flex items-center justify-center transition">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-10 text-text-muted">
+              <i class="bi bi-inbox text-3xl block mb-2 opacity-50"></i>
+              No reviews match the current criteria.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
