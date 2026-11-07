@@ -359,3 +359,49 @@ def test_customer_order_history_strictly_scoped_to_purchases(client):
     assert res_det_u3.status_code == 200
     assert b"ORD-ISOLATE-U3" in res_det_u3.data
 
+
+def test_checkout_places_order_and_persists_to_order_history(client):
+    """When a customer checks out, the order is stored in DB and appears in their Order History."""
+    import json
+
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 2
+        sess['username'] = 'test_user'
+        sess['email'] = 'user@techstore.test'
+        sess['role'] = 'user'
+
+    # Set cart cookie with 1 item
+    cart_data = [{"id": 1, "qty": 2, "price": 99.99}]
+    client.set_cookie('cart_list', json.dumps(cart_data))
+
+    # Place order via POST /checkout
+    res_post = client.post('/checkout', data={
+        'first_name': 'Test',
+        'last_name': 'Buyer',
+        'address': '123 Tech Street, Phnom Penh',
+        'phone': '012345678',
+        'email': 'user@techstore.test',
+        'payment': 'cod'
+    })
+    assert res_post.status_code == 200
+    assert b"Order placed successfully" in res_post.data
+
+    # Verify order was stored in database
+    placed_order = Order.query.filter_by(user_id=2, email='user@techstore.test').order_by(Order.created_at.desc()).first()
+    assert placed_order is not None
+    assert placed_order.customer_name == "Test Buyer"
+    assert placed_order.status == 'pending'
+    assert placed_order.total_cents > 0
+
+    # Verify order appears in customer's /account/orders view
+    res_orders = client.get('/account/orders')
+    assert res_orders.status_code == 200
+    assert placed_order.order_number.encode() in res_orders.data
+
+    # Verify customer can view order details
+    res_detail = client.get(f'/account/orders/{placed_order.order_number}')
+    assert res_detail.status_code == 200
+    assert placed_order.order_number.encode() in res_detail.data
+    assert b"123 Tech Street, Phnom Penh" in res_detail.data
+
