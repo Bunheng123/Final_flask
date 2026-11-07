@@ -290,8 +290,9 @@ def test_low_stock_alert_triggered_explicit_threshold(app, sample_catalog, monke
         msg = alert["msg"]
         chat_id = alert["chat_id"]
 
-        # Alert must target the 429 rate limit security alert channel (@pp_shop_alert)
-        assert chat_id == "@pp_shop_alert"
+        # Alert must target the 429 rate limit security alert channel
+        expected_chat = app.config.get("TELEGRAM_ALERT_CHAT_ID") or "@pp_shop_alert"
+        assert chat_id == expected_chat
         assert "LOW STOCK ALERT" in msg
         assert "ThinkPad X1 Carbon" in msg
         assert "Pro (32GB / 1TB)" in msg
@@ -333,7 +334,8 @@ def test_low_stock_alert_triggered_fallback_threshold(app, sample_catalog, monke
         msg = alert["msg"]
         chat_id = alert["chat_id"]
 
-        assert chat_id == "@pp_shop_alert"
+        expected_chat = app.config.get("TELEGRAM_ALERT_CHAT_ID") or "@pp_shop_alert"
+        assert chat_id == expected_chat
         assert "LOW STOCK ALERT" in msg
         assert "iPhone 15 Pro" in msg
         assert "IP15P-128" in msg
@@ -397,7 +399,8 @@ def test_low_stock_alert_triggered_on_manual_stock_update(app, sample_catalog, m
 
         assert len(dispatched_alerts) == 1
         alert = dispatched_alerts[0]
-        assert alert["chat_id"] == "@pp_shop_alert"
+        expected_chat = app.config.get("TELEGRAM_ALERT_CHAT_ID") or "@pp_shop_alert"
+        assert alert["chat_id"] == expected_chat
         assert "Remaining Stock: <b>1</b>" in alert["msg"]
         assert f"/admin/products/{sample_catalog['prod1_id']}/variants" in alert["msg"]
 
