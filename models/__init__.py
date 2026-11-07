@@ -11,6 +11,7 @@ from models.coupon_redemption import CouponRedemption
 from models.wishlist_item import WishlistItem
 from models.product_review import ProductReview
 from models.notification import Notification
+from models.wallet_transaction import WalletTransaction
 
 __all__ = [
     'User',
@@ -26,4 +27,5 @@ __all__ = [
     'WishlistItem',
     'ProductReview',
     'Notification',
+    'WalletTransaction',
 ]

@@ -2,6 +2,7 @@ import json
 from flask import render_template, request, make_response, redirect, url_for
 from front import front_bp
 from product import get_product_by_id
+from helpers.currency import khr_format, usd_format
 
 # helper, read cart cookie and return list of items, validate make sure qty > 1
 def _read_cart_cookie():
@@ -63,11 +64,25 @@ def _add_product_to_cart(cart_list, product, qty=1):
     })
     return cart_list
 
+@front_bp.app_template_filter('khr_format')
+def khr_format_filter(value):
+    return khr_format(value)
+
+
+@front_bp.app_template_filter('usd_format')
+def usd_format_filter(value):
+    return usd_format(value)
+
+
 # render the cart number in header
 @front_bp.app_context_processor
 def inject_cart_count():
     cart_items = _read_cart_cookie()
-    return dict(cart_count=len(cart_items))
+    return {
+        'cart_count': len(cart_items),
+        'khr_format': khr_format,
+        'usd_format': usd_format,
+    }
 
 # get current cart cookie, (id,qty,price)
 @front_bp.get('/cart', endpoint='cart')

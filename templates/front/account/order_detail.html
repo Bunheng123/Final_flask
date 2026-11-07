@@ -23,7 +23,7 @@
               {{ order.status|capitalize }}
             </span>
           </h1>
-          <p class="text-xs text-slate-400 mt-1">Placed on {% if order.created_at %}{{ to_local(order.created_at).strftime('%B %d, %Y at %I:%M %p') }}{% endif %}</p>
+          <p class="text-xs text-slate-400 mt-1">Placed on {% if order.created_at and to_local is defined %}{{ to_local(order.created_at).strftime('%B %d, %Y at %I:%M %p') }}{% elif order.created_at %}{{ order.created_at.strftime('%B %d, %Y') }}{% endif %}</p>
         </div>
 
         <div class="flex items-center gap-3">
@@ -50,6 +50,53 @@
         {% endif %}
       {% endwith %}
 
+      <!-- KHQR Real-time Status Polling -->
+      {% if payment_check_url and order.payment_status in ['pending', 'cancelled'] %}
+        <div id="order-payment-status" data-payment-check-url="{{ payment_check_url }}"
+          class="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <svg class="animate-spin h-5 w-5 text-amber-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span id="order-payment-status-text">Checking KHQR payment status in real-time...</span>
+          </div>
+        </div>
+        <script>
+          (function () {
+            const panel = document.getElementById('order-payment-status');
+            const statusText = document.getElementById('order-payment-status-text');
+            const checkUrl = panel.dataset.paymentCheckUrl;
+            let checking = false;
+            let timer;
+            async function checkPayment() {
+              if (checking) return;
+              checking = true;
+              try {
+                const response = await fetch(checkUrl, { cache: 'no-store', headers: { Accept: 'application/json' } });
+                const result = await response.json();
+                if (response.ok && result.success && result.data.status === 'paid') {
+                  window.clearInterval(timer);
+                  statusText.textContent = 'KHQR payment confirmed! Updating order status...';
+                  window.location.reload();
+                } else if (response.ok && result.success && result.data.status === 'expired') {
+                  window.clearInterval(timer);
+                  statusText.textContent = 'KHQR payment expired. Any reserved wallet funds have been returned.';
+                } else {
+                  statusText.textContent = 'Awaiting KHQR payment confirmation...';
+                }
+              } catch (error) {
+                statusText.textContent = 'Payment status check momentarily unavailable.';
+              } finally {
+                checking = false;
+              }
+            }
+            checkPayment();
+            timer = window.setInterval(checkPayment, 4000);
+          })();
+        </script>
+      {% endif %}
+
       <!-- 4-Hour Cancellation Grace Period Banner -->
       {% if can_cancel %}
         <div class="mb-8 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-lg shadow-amber-500/5">
@@ -65,11 +112,11 @@
                 </span>
               </div>
               <p class="text-xs text-amber-300/80 mt-1">
-                You can self-service cancel this order within 4 hours of placement for an instant full refund and stock return.
+                You can cancel this order within 4 hours of placement for an instant full refund (to your wallet) and inventory return.
               </p>
             </div>
           </div>
-          <form id="cancel-order-form" action="{{ url_for('front_bp.account_order_cancel', order_number=order.order_number) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel Order #{{ order.order_number }}? Inventory stock will be immediately restored.');" class="shrink-0">
+          <form id="cancel-order-form" action="{{ url_for('front_bp.account_order_cancel', order_number=order.order_number) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel Order #{{ order.order_number }}? Inventory stock will be restored and any paid funds credited to your wallet.');" class="shrink-0">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button id="cancel-btn" type="submit" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
@@ -81,7 +128,7 @@
         <script>
           // Live JavaScript Grace Period Countdown
           (function() {
-            var remaining = {{ time_remaining_seconds }};
+            var remaining = {{ time_remaining_seconds if time_remaining_seconds is defined else 0 }};
             var badge = document.getElementById('countdown-badge');
             var cancelBtn = document.getElementById('cancel-btn');
 
@@ -113,7 +160,7 @@
           <div>
             <h4 class="text-sm font-bold text-rose-200">Order Cancelled</h4>
             <p class="text-xs text-rose-300/80 mt-0.5">
-              This order was cancelled on {% if order.cancelled_at %}{{ to_local(order.cancelled_at).strftime('%B %d, %Y at %I:%M %p') }}{% else %}N/A{% endif %}.
+              This order was cancelled on {% if order.cancelled_at and to_local is defined %}{{ to_local(order.cancelled_at).strftime('%B %d, %Y at %I:%M %p') }}{% elif order.cancelled_at %}{{ order.cancelled_at.strftime('%B %d, %Y') }}{% else %}N/A{% endif %}.
               Reserved inventory stock has been restored.
             </p>
           </div>
@@ -136,7 +183,7 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
               <span class="text-xs font-bold text-white mt-2">Order Placed</span>
-              <span class="text-[10px] text-slate-400 mt-0.5">{% if order.created_at %}{{ to_local(order.created_at).strftime('%b %d, %I:%M %p') }}{% endif %}</span>
+              <span class="text-[10px] text-slate-400 mt-0.5">{% if order.created_at and to_local is defined %}{{ to_local(order.created_at).strftime('%b %d, %I:%M %p') }}{% elif order.created_at %}{{ order.created_at.strftime('%b %d') }}{% endif %}</span>
             </div>
 
             <!-- Step 2: Confirmed -->
@@ -150,7 +197,7 @@
               </div>
               <span class="text-xs font-bold {% if order.status in ('confirmed', 'shipped', 'delivered') %}text-white{% else %}text-slate-500{% endif %} mt-2">Confirmed</span>
               <span class="text-[10px] text-slate-400 mt-0.5">
-                {% if order.confirmed_at %}{{ to_local(order.confirmed_at).strftime('%b %d, %I:%M %p') }}{% elif order.status in ('confirmed', 'shipped', 'delivered') %}Processing{% else %}Pending{% endif %}
+                {% if order.confirmed_at and to_local is defined %}{{ to_local(order.confirmed_at).strftime('%b %d, %I:%M %p') }}{% elif order.status in ('confirmed', 'shipped', 'delivered') %}Processing{% else %}Pending{% endif %}
               </span>
             </div>
 
@@ -165,7 +212,7 @@
               </div>
               <span class="text-xs font-bold {% if order.status in ('shipped', 'delivered') %}text-white{% else %}text-slate-500{% endif %} mt-2">Shipped</span>
               <span class="text-[10px] text-slate-400 mt-0.5">
-                {% if order.shipped_at %}{{ to_local(order.shipped_at).strftime('%b %d, %I:%M %p') }}{% elif order.status in ('shipped', 'delivered') %}On Route{% else %}Awaiting{% endif %}
+                {% if order.shipped_at and to_local is defined %}{{ to_local(order.shipped_at).strftime('%b %d, %I:%M %p') }}{% elif order.status in ('shipped', 'delivered') %}On Route{% else %}Awaiting{% endif %}
               </span>
             </div>
 
@@ -180,7 +227,7 @@
               </div>
               <span class="text-xs font-bold {% if order.status == 'delivered' %}text-emerald-400{% else %}text-slate-500{% endif %} mt-2">Delivered</span>
               <span class="text-[10px] text-slate-400 mt-0.5">
-                {% if order.delivered_at %}{{ to_local(order.delivered_at).strftime('%b %d, %I:%M %p') }}{% elif order.status == 'delivered' %}Delivered{% else %}Pending{% endif %}
+                {% if order.delivered_at and to_local is defined %}{{ to_local(order.delivered_at).strftime('%b %d, %I:%M %p') }}{% elif order.status == 'delivered' %}Delivered{% else %}Pending{% endif %}
               </span>
             </div>
           </div>
@@ -217,7 +264,7 @@
                     <tr class="hover:bg-slate-800/30 transition group">
                       <td class="px-4 py-4">
                         <div class="font-bold text-white group-hover:text-indigo-300 transition">{{ item.product_name }}</div>
-                        <div class="text-xs text-indigo-400 font-medium mt-0.5">{{ item.spec_name }}</div>
+                        {% if item.spec_name %}<div class="text-xs text-indigo-400 font-medium mt-0.5">{{ item.spec_name }}</div>{% endif %}
 
                         <!-- Review Action Link for Confirmed/Delivered Orders -->
                         {% if order.status in ('confirmed', 'delivered') and item.variant and item.variant.product_id %}
@@ -231,9 +278,21 @@
                         {% endif %}
                       </td>
                       <td class="px-4 py-4 text-xs font-mono text-slate-400">{{ item.sku }}</td>
-                      <td class="px-4 py-4 text-xs font-medium">{{ format_money(item.unit_price_cents) }}</td>
+                      <td class="px-4 py-4 text-xs font-medium">
+                        {% if format_money is defined %}
+                          {{ format_money(item.unit_price_cents) }}
+                        {% else %}
+                          ${{ "%.2f"|format(item.unit_price_cents / 100) }}
+                        {% endif %}
+                      </td>
                       <td class="px-4 py-4 text-center font-bold text-white">{{ item.qty }}</td>
-                      <td class="px-4 py-4 text-right font-bold text-white">{{ format_money(item.line_total_cents) }}</td>
+                      <td class="px-4 py-4 text-right font-bold text-white">
+                        {% if format_money is defined %}
+                          {{ format_money(item.line_total_cents) }}
+                        {% else %}
+                          ${{ "%.2f"|format(item.line_total_cents / 100) }}
+                        {% endif %}
+                      </td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -244,7 +303,13 @@
             <div class="mt-6 pt-6 border-t border-slate-800/80 space-y-2.5 text-xs max-w-xs ml-auto">
               <div class="flex justify-between text-slate-400">
                 <span>Subtotal</span>
-                <span class="text-white font-medium">{{ format_money(order.subtotal_cents) }}</span>
+                <span class="text-white font-medium">
+                  {% if format_money is defined %}
+                    {{ format_money(order.subtotal_cents) }}
+                  {% else %}
+                    ${{ "%.2f"|format(order.subtotal_cents / 100) }}
+                  {% endif %}
+                </span>
               </div>
               {% if order.discount_cents and order.discount_cents > 0 %}
                 <div class="flex justify-between text-emerald-400">
@@ -252,7 +317,9 @@
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                     Discount {% if order.coupon_code %}<code class="text-[10px] bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/20">({{ order.coupon_code }})</code>{% endif %}
                   </span>
-                  <span class="font-bold">-{{ format_money(order.discount_cents) }}</span>
+                  <span class="font-bold">
+                    -{% if format_money is defined %}{{ format_money(order.discount_cents) }}{% else %}${{ "%.2f"|format(order.discount_cents / 100) }}{% endif %}
+                  </span>
                 </div>
               {% endif %}
               <div class="flex justify-between text-slate-400">
@@ -262,9 +329,15 @@
               <div class="flex justify-between text-base font-black text-white pt-3 border-t border-slate-800">
                 <span>Total Due</span>
                 <div class="text-right">
-                  <span class="text-indigo-400 block">{{ format_money(order.total_cents) }}</span>
-                  <span class="text-[11px] font-normal text-slate-500">
-                    &asymp; {{ "{:,}".format((order.total_cents * 41)|int) }} &#x17DB; (KHR)
+                  <span class="text-indigo-400 block">
+                    {% if format_money is defined %}
+                      {{ format_money(order.total_cents) }}
+                    {% else %}
+                      ${{ "%.2f"|format(order.total_cents / 100) }}
+                    {% endif %}
+                  </span>
+                  <span class="text-[11px] font-normal text-slate-400">
+                    &asymp; {% if khr_format is defined and order.total_khr %}{{ khr_format(order.total_khr) }}{% else %}{{ "{:,}".format((order.total_cents * 41)|int) }} &#x17DB;{% endif %}
                   </span>
                 </div>
               </div>
@@ -310,19 +383,25 @@
               <div class="flex justify-between items-center">
                 <span class="text-slate-500">Method</span>
                 <span class="text-white font-semibold uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-[11px]">
-                  {{ order.payment_method }}
+                  {{ (order.payment_method or 'COD')|upper }}
                 </span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-slate-500">Payment Status</span>
-                <span class="font-bold text-xs {% if order.status == 'cancelled' %}text-rose-400{% else %}text-emerald-400{% endif %}">
-                  {% if order.status == 'cancelled' %}Refunded / Cancelled{% else %}Confirmed / Paid{% endif %}
+                <span class="font-bold text-xs capitalize {% if order.status == 'cancelled' %}text-rose-400{% elif order.payment_status == 'paid' or order.status in ('confirmed', 'shipped', 'delivered') %}text-emerald-400{% else %}text-amber-400{% endif %}">
+                  {{ order.payment_status or ('Refunded' if order.status == 'cancelled' else 'Confirmed / Paid') }}
                 </span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-slate-500">Currency</span>
                 <span class="text-white font-medium">USD ($) / KHR (&#x17DB;)</span>
               </div>
+              {% if order.wallet_used_khr and order.wallet_used_khr > 0 %}
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-500">Wallet Credit Applied</span>
+                  <span class="text-indigo-300 font-mono">{{ khr_format(order.wallet_used_khr) if khr_format is defined else order.wallet_used_khr }}</span>
+                </div>
+              {% endif %}
             </div>
           </div>
         </div>

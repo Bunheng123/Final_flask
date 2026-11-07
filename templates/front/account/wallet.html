@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include 'front/share/header.html' %}
+  <title>My Wallet - TechStore</title>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col">
+  {% include 'front/share/navbar.html' %}
+
+  <main class="max-w-5xl mx-auto px-6 py-10 flex-1 w-full space-y-8">
+    <div>
+      <a href="{{ url_for('front_bp.account') }}" class="text-xs font-semibold text-indigo-400 hover:text-indigo-300">
+        &larr; Back to Account
+      </a>
+      <h1 class="mt-3 text-3xl font-extrabold">Customer Wallet</h1>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="rounded-xl border px-4 py-3 {{ 'border-red-500/30 bg-red-500/10 text-red-200' if category == 'error' else 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <section class="grid md:grid-cols-2 gap-6">
+      <div class="rounded-3xl border border-indigo-500/20 bg-slate-800 p-6">
+        <p class="text-xs uppercase tracking-widest text-slate-400">Available balance</p>
+        <p class="mt-2 text-3xl font-bold text-indigo-300">{{ khr_format(wallet_balance_khr) }}</p>
+      </div>
+      <form method="post" class="rounded-3xl border border-white/10 bg-slate-800 p-6 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="amount-khr" class="block font-semibold">Add funds with KHQR</label>
+        <p class="text-sm text-slate-400">Wallet credit is added only after Bakong confirms payment.</p>
+        <input id="amount-khr" name="amount_khr" type="number" min="1" step="1" required
+          placeholder="Amount in KHR" class="w-full rounded-xl bg-slate-900 p-3 text-white">
+        <button type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold hover:bg-indigo-500">
+          Generate top-up QR
+        </button>
+      </form>
+    </section>
+
+    {% if khqr_payment %}
+      <section id="wallet-topup" data-payment-check-url="{{ payment_check_url }}"
+        class="rounded-3xl border border-indigo-500/30 bg-slate-800 p-6 text-center">
+        <h2 class="text-xl font-bold">Scan to top up {{ khr_format(khqr_payment.amount_khr) }}</h2>
+        <img src="{{ khqr_payment.base64_uri }}" alt="Wallet top-up KHQR"
+          class="mx-auto mt-5 h-64 w-64 rounded-2xl bg-white object-contain p-4">
+        <p id="topup-status" class="mt-4 text-sm text-emerald-300" aria-live="polite"></p>
+      </section>
+      <script>
+        (function () {
+          const panel = document.getElementById('wallet-topup');
+          const status = document.getElementById('topup-status');
+          const checkUrl = panel.dataset.paymentCheckUrl;
+          let checking = false;
+          async function checkPayment() {
+            if (checking) return;
+            checking = true;
+            try {
+              const response = await fetch(checkUrl, { cache: 'no-store', headers: { Accept: 'application/json' } });
+              const result = await response.json();
+              if (response.ok && result.success && result.data.status === 'paid') {
+                status.textContent = 'Payment success';
+                window.location.reload();
+              }
+            } catch (error) {
+              console.error('Unable to verify wallet top-up payment.', error);
+            } finally {
+              checking = false;
+            }
+          }
+          checkPayment();
+          const timer = window.setInterval(checkPayment, 5000);
+        })();
+      </script>
+    {% endif %}
+
+    {% if pending_topup_references %}
+      <script>
+        (function () {
+          const paymentReferences = {{ pending_topup_references|tojson }};
+          let checking = false;
+          async function checkPendingTopups() {
+            if (checking) return;
+            checking = true;
+            try {
+              for (const reference of paymentReferences) {
+                const paymentUrl = {{ url_for('api_bp.payment_check', payment_hash='PAYMENT_REFERENCE')|tojson }}.replace('PAYMENT_REFERENCE', encodeURIComponent(reference));
+                const response = await fetch(paymentUrl, { cache: 'no-store', headers: { Accept: 'application/json' } });
+                const result = await response.json();
+                if (response.ok && result.success && result.data.status === 'paid') {
+                  window.setTimeout(function () { window.location.reload(); }, 900);
+                }
+              }
+            } catch (error) {
+              console.error('Unable to verify a pending wallet top-up.', error);
+            } finally {
+              checking = false;
+            }
+          }
+          checkPendingTopups();
+          window.setInterval(checkPendingTopups, 5000);
+        })();
+      </script>
+    {% endif %}
+
+    <section class="rounded-3xl border border-white/10 bg-slate-800 p-6">
+      <h2 class="mb-4 text-xl font-bold">Wallet activity</h2>
+      {% if transactions %}
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[600px] text-left text-sm">
+            <thead class="border-b border-slate-700 text-xs uppercase text-slate-400">
+              <tr><th class="py-3">Date</th><th>Activity</th><th>Status</th><th>Amount</th><th>Balance</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700/60">
+              {% for transaction in transactions %}
+                <tr>
+                  <td class="py-3 text-slate-400">{{ to_local(transaction.created_at).strftime('%b %d, %Y %H:%M') }}</td>
+                  <td>{{ transaction.description or transaction.transaction_type|replace('_', ' ')|title }}</td>
+                  <td class="text-emerald-300">Payment success</td>
+                  <td class="{{ 'text-emerald-300' if transaction.amount_khr > 0 else 'text-rose-300' }}">
+                    {{ '+' if transaction.amount_khr > 0 else '' }}{{ khr_format(transaction.amount_khr) }}
+                  </td>
+                  <td>{{ khr_format(transaction.balance_after_khr) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-sm text-slate-400">No wallet activity yet.</p>
+      {% endif %}
+    </section>
+  </main>
+
+  {% include 'front/share/footer.html' %}
+</body>
+</html>

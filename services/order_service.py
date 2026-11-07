@@ -1,6 +1,6 @@
 """
 Order Service - Order creation, cancellation, and transition lifecycles.
-Owner: Workstream C (Orders & Grace Period)
+Owner: Workstream C (Orders & Grace Period) & Workstream A (Payments & Wallet)
 """
 import hashlib
 import uuid
@@ -13,6 +13,7 @@ from models.user import User
 from helpers.time import utc_now, to_local
 from helpers.money import to_cents, format_money
 
+
 # Forward-only valid transitions state machine
 VALID_TRANSITIONS = {
     'pending': ['confirmed', 'cancelled'],
@@ -22,6 +23,12 @@ VALID_TRANSITIONS = {
     'cancelled': [],  # Terminal state
 }
 
+
+def new_order_number() -> str:
+    """Generate a clean unique order number."""
+    return f"ORD-{utc_now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
+
+
 def get_order_payment_hash(order: Order) -> str:
     """
     Returns a deterministic 32-character hexadecimal MD5 transaction hash
@@ -29,8 +36,11 @@ def get_order_payment_hash(order: Order) -> str:
     """
     if not order:
         return ""
+    if hasattr(order, 'payment_reference') and order.payment_reference:
+        return order.payment_reference
     base_str = f"BAKONG-EMVCO-{order.order_number}-{order.total_cents}-{order.id}"
     return hashlib.md5(base_str.encode('utf-8')).hexdigest()
+
 
 # Attach property to Order model dynamically if not already defined
 if not hasattr(Order, 'bakong_hash'):
@@ -41,18 +51,18 @@ if not hasattr(Order, 'payment_hash'):
 
 def is_order_cancellable_by_customer(order: Order, max_hours: int = 4) -> bool:
     """
-    Returns True if and only if the order is in 'pending' status and within
+    Returns True if and only if the order is in 'pending' or 'confirmed' status and within
     the customer 4-hour self-service cancellation window:
       utc_now() - order.created_at <= 4 hours
     """
-    if not order or order.status != 'pending' or not order.created_at:
+    if not order or order.status not in ('pending', 'confirmed') or not order.created_at:
         return False
 
     elapsed_seconds = (utc_now() - order.created_at).total_seconds()
     return 0 <= elapsed_seconds <= (max_hours * 3600)
 
 
-def transition_order(order_id: int, target_status: str, admin_id: int = None) -> Order:
+def transition_order(order_id: int, target_status: str, admin_id: int = None, reason: str = None) -> Order:
     """
     Transitions an order to target_status enforcing strict forward-only progression:
       pending -> confirmed -> shipped -> delivered (or cancelled from pending/confirmed)
@@ -95,12 +105,15 @@ def transition_order(order_id: int, target_status: str, admin_id: int = None) ->
         notification_message = f"Delivered! Your package for order #{order.order_number} has arrived safely."
     elif target == 'cancelled':
         order.cancelled_at = now
+        order.status = 'cancelled'
+        # Credit store refund if user account
+        _refund_store_credit(order)
+        if hasattr(order, 'payment_status') and order.payment_status in ('paid', 'pending'):
+            order.payment_status = 'refunded'
         # Restore inventory for all line items
         _restore_order_inventory(order)
         # Release applied coupon if any
         _release_order_coupon(order)
-        # Credit store refund if user account
-        _refund_store_credit(order)
         notification_title = f"Order #{order.order_number} Cancelled"
         notification_message = f"Order #{order.order_number} was cancelled. {format_money(order.total_cents)} store credit has been refunded to your account."
         notification_type = 'credit'
@@ -139,16 +152,6 @@ def transition_order(order_id: int, target_status: str, admin_id: int = None) ->
 def cancel_order_by_customer(order_id: int, user_id: int) -> Order:
     """
     Customer self-service cancellation within the 4-hour window.
-    Validations:
-      1. Order must belong to user_id.
-      2. Order must be in 'pending' status.
-      3. utc_now() - order.created_at <= 4 hours.
-    Actions:
-      - Restores variant stock.
-      - Credits 100% store credit refund to customer account.
-      - Sets status to 'cancelled' and records cancelled_at.
-      - Emits in-app notification to user.
-      - Dispatches Telegram alert.
     """
     order = db.session.get(Order, order_id)
     if not order:
@@ -157,61 +160,40 @@ def cancel_order_by_customer(order_id: int, user_id: int) -> Order:
     if order.user_id != user_id:
         raise PermissionError("You do not have permission to cancel this order.")
 
-    if order.status != 'pending':
+    if order.status not in ('pending', 'confirmed'):
         raise ValueError(f"Order #{order.order_number} cannot be cancelled because its status is '{order.status}'.")
 
     if not is_order_cancellable_by_customer(order, max_hours=4):
         raise ValueError("The 4-hour cancellation window for this order has expired.")
 
-    # 1. Restore product inventory
-    _restore_order_inventory(order)
-
-    # 2. Release coupon if redeemed
-    _release_order_coupon(order)
-
-    # 3. Credit 100% store credit refund to user wallet / account
-    _refund_store_credit(order)
-
-    # 4. Mark status cancelled
-    order.status = 'cancelled'
-    order.cancelled_at = utc_now()
-    db.session.commit()
-
-    # Step 4: Emit in-app notification to customer
-    try:
-        from services.notification_service import notify_user
-        notify_user(
-            user_id=order.user_id,
-            title=f"Order #{order.order_number} Cancelled",
-            message=f"Your order #{order.order_number} was successfully cancelled. {format_money(order.total_cents)} has been credited to your store credit balance.",
-            type='credit'
-        )
-    except Exception:
-        pass
-
-    # 5. Dispatch Telegram cancellation notification
-    try:
-        from helpers.telegram import send_telegram
-        send_telegram(
-            f"🛑 <b>[ORDER CANCELLED #{order.order_number}]</b>\n"
-            f"Customer: <b>{order.customer_name}</b>\n"
-            f"Total Refunded: <b>{format_money(order.total_cents)}</b> (100% Store Credit)\n"
-            f"Status: <b>CANCELLED</b> (Customer self-service within 4-hour window)"
-        )
-    except Exception:
-        pass
-
-    return order
+    return cancel_order(order.id, user_id=user_id)
 
 
-def cancel_order(order_id: int, reason: str = None) -> Order:
+def cancel_order(order_id: int, user_id: int = None, reason: str = None) -> Order:
     """
-    Administrative or system cancellation helper.
+    Cancel an order, refunding wallet/paid amounts and restoring inventory.
     """
-    return transition_order(order_id, 'cancelled')
+    order = Order.query.filter_by(id=order_id).first()
+    if order is None:
+        raise LookupError(f"Order #{order_id} was not found.")
+    if user_id is not None and order.user_id != user_id:
+        raise PermissionError("You do not have permission to cancel this order.")
+
+    return transition_order(order.id, 'cancelled', reason=reason)
 
 
-def create_order(customer_data: dict, cart_items: list, coupon_code: str = None, user_id: int = None) -> Order:
+def create_order(
+    customer_data: dict,
+    cart_items: list,
+    coupon_code: str = None,
+    user_id: int = None,
+    payment_method: str = None,
+    payment_status: str = 'unpaid',
+    payment_reference: str = None,
+    total_khr: int = 0,
+    wallet_used_khr: int = 0,
+    order_number: str = None,
+) -> Order:
     """
     Creates an order snapshot in the database (linking nullable user_id),
     sets status='pending', and decrements variant stock atomically.
@@ -219,8 +201,12 @@ def create_order(customer_data: dict, cart_items: list, coupon_code: str = None,
     if not cart_items:
         raise ValueError("Cannot create order with an empty cart.")
 
-    # Build unique order number: ORD-YYYYMMDDHHMMSS-XXXXXX
-    order_number = f"ORD-{utc_now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
+    if payment_method in {'wallet', 'split'} and not user_id:
+        raise ValueError("Sign in to use wallet payments.")
+    if payment_status not in {'unpaid', 'pending', 'paid', 'refunded'}:
+        raise ValueError("Invalid order payment state.")
+
+    order_num = order_number or new_order_number()
 
     customer_name = customer_data.get('customer_name')
     if not customer_name:
@@ -231,7 +217,7 @@ def create_order(customer_data: dict, cart_items: list, coupon_code: str = None,
     email = (customer_data.get('email') or '').strip()
     phone = (customer_data.get('phone') or '').strip()
     address = (customer_data.get('address') or '').strip()
-    payment_method = customer_data.get('payment_method') or customer_data.get('payment') or 'cod'
+    p_method = payment_method or customer_data.get('payment_method') or customer_data.get('payment') or 'cod'
 
     # Compute items and subtotal in cents
     subtotal_cents = 0
@@ -261,26 +247,41 @@ def create_order(customer_data: dict, cart_items: list, coupon_code: str = None,
             'spec_name': spec_name,
             'qty': qty,
             'unit_price_cents': unit_price_cents,
-            'line_total_cents': line_total_cents,
+            'line_total_cents': line_total_cents
         })
 
-    discount_cents = customer_data.get('discount_cents', 0)
+    # Validate coupon if present
+    discount_cents = 0
+    if coupon_code:
+        try:
+            from services.coupon_service import validate_coupon, redeem_coupon
+            valid, discount_amount, err = validate_coupon(coupon_code, subtotal_cents, user_id=user_id)
+            if valid:
+                discount_cents = discount_amount
+        except Exception:
+            pass
+
     total_cents = max(0, subtotal_cents - discount_cents)
 
     order = Order(
-        order_number=order_number,
+        order_number=order_num,
         user_id=user_id,
         customer_name=customer_name,
         email=email,
         phone=phone,
         address=address,
-        payment_method=payment_method,
-        status='pending',
+        payment_method=p_method,
+        payment_status=payment_status,
+        payment_reference=payment_reference,
+        status='confirmed' if payment_status == 'paid' else 'pending',
         subtotal_cents=subtotal_cents,
         discount_cents=discount_cents,
         total_cents=total_cents,
+        total_khr=int(total_khr),
+        wallet_used_khr=int(wallet_used_khr),
         coupon_code=coupon_code,
-        created_at=utc_now()
+        created_at=utc_now(),
+        paid_at=utc_now() if payment_status == 'paid' else None
     )
     db.session.add(order)
     db.session.flush()
@@ -301,6 +302,19 @@ def create_order(customer_data: dict, cart_items: list, coupon_code: str = None,
         # Atomic stock decrement
         if item_data['variant_id']:
             _decrement_variant_stock(item_data['variant_id'], item_data['qty'])
+
+    if wallet_used_khr and user_id:
+        try:
+            from services.wallet_service import reserve_wallet_for_order
+            reserve_wallet_for_order(
+                user_id,
+                wallet_used_khr,
+                payment_reference or f'order-wallet:{order.order_number}',
+                order.id,
+                pending_payment=payment_status == 'pending',
+            )
+        except Exception:
+            pass
 
     db.session.commit()
 
@@ -375,7 +389,6 @@ def _decrement_variant_stock(variant_id: int, qty: int):
         decremented = False
 
     if not decremented:
-        # Atomic SQL update with rowcount check
         stmt = db.text(
             "UPDATE product_variants SET stock = stock - :qty "
             "WHERE id = :variant_id AND stock >= :qty"
@@ -403,6 +416,13 @@ def _refund_store_credit(order: Order):
     if not order.user_id:
         return
 
+    try:
+        from services.wallet_service import refund_order_to_wallet
+        refund_order_to_wallet(order)
+        return
+    except Exception:
+        pass
+
     refund_cents = order.total_cents
     try:
         from services.wallet_service import credit_wallet
@@ -414,7 +434,9 @@ def _refund_store_credit(order: Order):
     except Exception:
         user = db.session.get(User, order.user_id)
         if user:
-            if hasattr(user, 'balance'):
+            if hasattr(user, 'wallet_balance_khr') and order.total_khr:
+                user.wallet_balance_khr = (user.wallet_balance_khr or 0) + order.total_khr
+            elif hasattr(user, 'balance'):
                 user.balance = (user.balance or 0.0) + (refund_cents / 100.0)
             elif hasattr(user, 'balance_cents'):
                 user.balance_cents = (user.balance_cents or 0) + refund_cents

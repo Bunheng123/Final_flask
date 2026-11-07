@@ -1,11 +1,12 @@
 {# Owner: Developer 5 (Customer Portal, Social Commerce & API Security) #}
-{% set prod_id = product.id if product is defined and product else 0 %}
+{% set prod_id = product.id if (product is defined and product and product.id is defined) else (product_id if product_id is defined else 0) %}
 {% set in_wishlist = false %}
 {% if session.get('is_login') and session.get('user_id') and WishlistItem is defined and prod_id %}
   {% set existing = WishlistItem.query.filter_by(user_id=session.get('user_id'), product_id=prod_id).first() %}
   {% if existing %}{% set in_wishlist = true %}{% endif %}
 {% endif %}
 
+{% if prod_id %}
 <button
   type="button"
   id="wishlistToggleBtn-{{ prod_id }}"
@@ -76,3 +77,4 @@ function toggleWishlist(productId) {
   });
 }
 </script>
+{% endif %}

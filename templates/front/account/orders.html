@@ -19,16 +19,20 @@
           <h1 class="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
             <span>Order History</span>
             <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-              {{ total_orders_count }} Total
+              {{ total_orders_count if total_orders_count is defined else (orders|length if orders is defined else 0) }} Total
             </span>
           </h1>
           <p class="text-xs text-slate-400 mt-1">Track your delivery status, download PDF invoices, and manage past purchases.</p>
         </div>
 
         <div class="flex items-center gap-3">
+          <a href="{{ url_for('front_bp.account_wallet') }}" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition border border-slate-700/80 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Customer Wallet
+          </a>
           <a href="{{ url_for('front_bp.products') }}" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/20 flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-            Continue Shopping
+            Browse Products
           </a>
         </div>
       </div>
@@ -56,7 +60,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
             </span>
           </div>
-          <div class="text-2xl font-black text-white">{{ total_orders_count }}</div>
+          <div class="text-2xl font-black text-white">{{ total_orders_count if total_orders_count is defined else (orders|length if orders is defined else 0) }}</div>
           <div class="text-[11px] text-slate-500 mt-1">Lifetime customer purchases</div>
         </div>
 
@@ -68,7 +72,15 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             </span>
           </div>
-          <div class="text-2xl font-black text-white">{{ format_money(total_spent_cents) }}</div>
+          <div class="text-2xl font-black text-white">
+            {% if total_spent_cents is defined and format_money is defined %}
+              {{ format_money(total_spent_cents) }}
+            {% elif total_spent_cents is defined %}
+              ${{ "%.2f"|format(total_spent_cents / 100) }}
+            {% else %}
+              $0.00
+            {% endif %}
+          </div>
           <div class="text-[11px] text-slate-500 mt-1">Excludes cancelled orders</div>
         </div>
 
@@ -80,7 +92,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </span>
           </div>
-          <div class="text-2xl font-black text-amber-400">{{ pending_count }}</div>
+          <div class="text-2xl font-black text-amber-400">{{ pending_count if pending_count is defined else 0 }}</div>
           <div class="text-[11px] text-slate-500 mt-1">Eligible for 4-hr cancellation</div>
         </div>
 
@@ -92,7 +104,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </span>
           </div>
-          <div class="text-2xl font-black text-teal-400">{{ delivered_count }}</div>
+          <div class="text-2xl font-black text-teal-400">{{ delivered_count if delivered_count is defined else 0 }}</div>
           <div class="text-[11px] text-slate-500 mt-1">Eligible for verified reviews</div>
         </div>
       </div>
@@ -101,50 +113,50 @@
       <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mb-6 backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <!-- Status Filter Pills -->
         <div class="flex flex-wrap items-center gap-2">
-          <a href="{{ url_for('front_bp.account_orders', status='all', q=search_q if search_q else None) }}"
-             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter == 'all' %}bg-indigo-600 text-white shadow-md shadow-indigo-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
+          <a href="{{ url_for('front_bp.account_orders', status='all', q=search_q if search_q is defined and search_q else None) }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter is not defined or status_filter == 'all' %}bg-indigo-600 text-white shadow-md shadow-indigo-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
             <span>All</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if status_filter == 'all' %}bg-indigo-700 text-white{% else %}bg-slate-700 text-slate-300{% endif %}">
-              {{ total_orders_count }}
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if status_filter is not defined or status_filter == 'all' %}bg-indigo-700 text-white{% else %}bg-slate-700 text-slate-300{% endif %}">
+              {{ total_orders_count if total_orders_count is defined else (orders|length if orders is defined else 0) }}
             </span>
           </a>
 
-          <a href="{{ url_for('front_bp.account_orders', status='pending', q=search_q if search_q else None) }}"
-             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter == 'pending' %}bg-amber-600 text-white shadow-md shadow-amber-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
+          <a href="{{ url_for('front_bp.account_orders', status='pending', q=search_q if search_q is defined and search_q else None) }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter is defined and status_filter == 'pending' %}bg-amber-600 text-white shadow-md shadow-amber-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
             <span class="w-2 h-2 rounded-full bg-amber-400"></span>
             <span>Pending</span>
-            {% if pending_count > 0 %}
+            {% if pending_count is defined and pending_count > 0 %}
               <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if status_filter == 'pending' %}bg-amber-700 text-white{% else %}bg-amber-500/20 text-amber-300{% endif %}">
                 {{ pending_count }}
               </span>
             {% endif %}
           </a>
 
-          <a href="{{ url_for('front_bp.account_orders', status='confirmed', q=search_q if search_q else None) }}"
-             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter == 'confirmed' %}bg-indigo-600 text-white shadow-md shadow-indigo-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
+          <a href="{{ url_for('front_bp.account_orders', status='confirmed', q=search_q if search_q is defined and search_q else None) }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter is defined and status_filter == 'confirmed' %}bg-indigo-600 text-white shadow-md shadow-indigo-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
             <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
             <span>Confirmed</span>
           </a>
 
-          <a href="{{ url_for('front_bp.account_orders', status='shipped', q=search_q if search_q else None) }}"
-             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter == 'shipped' %}bg-sky-600 text-white shadow-md shadow-sky-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
+          <a href="{{ url_for('front_bp.account_orders', status='shipped', q=search_q if search_q is defined and search_q else None) }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter is defined and status_filter == 'shipped' %}bg-sky-600 text-white shadow-md shadow-sky-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
             <span class="w-2 h-2 rounded-full bg-sky-400"></span>
             <span>Shipped</span>
           </a>
 
-          <a href="{{ url_for('front_bp.account_orders', status='delivered', q=search_q if search_q else None) }}"
-             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter == 'delivered' %}bg-emerald-600 text-white shadow-md shadow-emerald-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
+          <a href="{{ url_for('front_bp.account_orders', status='delivered', q=search_q if search_q is defined and search_q else None) }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter is defined and status_filter == 'delivered' %}bg-emerald-600 text-white shadow-md shadow-emerald-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
             <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
             <span>Delivered</span>
-            {% if delivered_count > 0 %}
+            {% if delivered_count is defined and delivered_count > 0 %}
               <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if status_filter == 'delivered' %}bg-emerald-700 text-white{% else %}bg-emerald-500/20 text-emerald-300{% endif %}">
                 {{ delivered_count }}
               </span>
             {% endif %}
           </a>
 
-          <a href="{{ url_for('front_bp.account_orders', status='cancelled', q=search_q if search_q else None) }}"
-             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter == 'cancelled' %}bg-rose-600 text-white shadow-md shadow-rose-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
+          <a href="{{ url_for('front_bp.account_orders', status='cancelled', q=search_q if search_q is defined and search_q else None) }}"
+             class="px-3.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 {% if status_filter is defined and status_filter == 'cancelled' %}bg-rose-600 text-white shadow-md shadow-rose-600/20{% else %}bg-slate-800/80 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-700/50{% endif %}">
             <span class="w-2 h-2 rounded-full bg-rose-400"></span>
             <span>Cancelled</span>
           </a>
@@ -152,20 +164,20 @@
 
         <!-- Search Bar -->
         <form method="GET" action="{{ url_for('front_bp.account_orders') }}" class="flex items-center gap-2 w-full md:w-auto">
-          {% if status_filter != 'all' %}
+          {% if status_filter is defined and status_filter != 'all' %}
             <input type="hidden" name="status" value="{{ status_filter }}"/>
           {% endif %}
           <div class="relative w-full md:w-64">
             <input type="text"
                    name="q"
-                   value="{{ search_q }}"
+                   value="{{ search_q if search_q is defined else '' }}"
                    placeholder="Search order #..."
                    class="w-full bg-slate-800/90 border border-slate-700 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"/>
             <span class="absolute left-3 top-2 text-slate-500">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             </span>
-            {% if search_q %}
-              <a href="{{ url_for('front_bp.account_orders', status=status_filter) }}" class="absolute right-2.5 top-2 text-slate-400 hover:text-white">
+            {% if search_q is defined and search_q %}
+              <a href="{{ url_for('front_bp.account_orders', status=status_filter if status_filter is defined else 'all') }}" class="absolute right-2.5 top-2 text-slate-400 hover:text-white">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </a>
             {% endif %}
@@ -180,7 +192,7 @@
       {% if orders %}
         <div class="space-y-4">
           {% for order in orders %}
-            {% set is_cancellable = (order.status == 'pending' and order.created_at and (utc_now() - order.created_at).total_seconds() <= 14400) %}
+            {% set is_cancellable = (order.status == 'pending' and order.created_at and utc_now is defined and (utc_now() - order.created_at).total_seconds() <= 14400) %}
             <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl hover:border-slate-700/80 transition shadow-lg shadow-black/20">
               <!-- Order Header -->
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-800/80">
@@ -198,8 +210,8 @@
                       </span>
                     </div>
                     <p class="text-xs text-slate-400 mt-0.5">
-                      Placed on {% if order.created_at %}{{ to_local(order.created_at).strftime('%b %d, %Y at %I:%M %p') }}{% endif %}
-                      &bull; <span class="text-slate-500">{{ order.payment_method|upper }}</span>
+                      Placed on {% if order.created_at and to_local is defined %}{{ to_local(order.created_at).strftime('%b %d, %Y at %I:%M %p') }}{% elif order.created_at %}{{ order.created_at.strftime('%b %d, %Y') }}{% endif %}
+                      &bull; <span class="text-slate-500">{{ (order.payment_method or 'COD')|upper }}</span>
                     </p>
                   </div>
                 </div>
@@ -207,7 +219,13 @@
                 <div class="flex items-center gap-3">
                   <div class="text-right sm:mr-2">
                     <span class="block text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Total Amount</span>
-                    <span class="text-lg font-black text-white">{{ format_money(order.total_cents) }}</span>
+                    <span class="text-lg font-black text-white">
+                      {% if format_money is defined %}
+                        {{ format_money(order.total_cents) }}
+                      {% else %}
+                        ${{ "%.2f"|format(order.total_cents / 100) }}
+                      {% endif %}
+                    </span>
                   </div>
 
                   <!-- Quick Action Buttons -->
@@ -242,7 +260,7 @@
                 {% for item in order.items %}
                   <span class="inline-flex items-center gap-1.5 bg-slate-800/90 px-3 py-1 rounded-lg border border-slate-700/60 text-slate-300">
                     <span class="font-medium text-white">{{ item.product_name }}</span>
-                    <span class="text-[11px] text-indigo-400">({{ item.spec_name }})</span>
+                    {% if item.spec_name %}<span class="text-[11px] text-indigo-400">({{ item.spec_name }})</span>{% endif %}
                     <span class="text-slate-500">&times;</span>
                     <span class="font-bold text-slate-200">{{ item.qty }}</span>
                   </span>
@@ -257,11 +275,11 @@
           <div class="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 flex items-center justify-center mx-auto mb-4 border border-indigo-500/20">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
           </div>
-          {% if search_q or status_filter != 'all' %}
+          {% if search_q is defined and search_q or (status_filter is defined and status_filter != 'all') %}
             <h3 class="text-xl font-bold text-white">No Matching Orders</h3>
             <p class="text-xs text-slate-400 mt-2 mb-6">
-              No orders found matching status <span class="font-semibold text-indigo-400">"{{ status_filter }}"</span>
-              {% if search_q %} or query <span class="font-semibold text-indigo-400">"{{ search_q }}"</span>{% endif %}.
+              No orders found matching status <span class="font-semibold text-indigo-400">"{{ status_filter if status_filter is defined else 'all' }}"</span>
+              {% if search_q is defined and search_q %} or query <span class="font-semibold text-indigo-400">"{{ search_q }}"</span>{% endif %}.
             </p>
             <a href="{{ url_for('front_bp.account_orders') }}" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs transition border border-slate-700">
               Clear All Filters

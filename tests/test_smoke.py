@@ -143,6 +143,7 @@ def test_api_users_requires_admin_session(client):
     # 2. Authenticated as role 'user'
     with client.session_transaction() as sess:
         sess['is_login'] = True
+        sess['user_id'] = 2
         sess['role'] = 'user'
     res_user = client.get('/api/users')
     assert res_user.status_code == 401
@@ -158,6 +159,7 @@ def test_stubs_501_on_post(client):
     """Unimplemented stubs must return 501 on POST."""
     with client.session_transaction() as sess:
         sess['is_login'] = True
+        sess['user_id'] = 2
         sess['role'] = 'user'
 
     assert client.post('/account').status_code == 501

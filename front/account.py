@@ -1,10 +1,22 @@
 """
 Customer Account & Order History Portal.
-Owner: Developer 5 (Customer Portal, Social Commerce & API Security)
+Owner: Developer 5 (Customer Portal, Social Commerce & API Security) & Developer 1 (Customer Wallet)
 """
+import uuid
 from datetime import timedelta
-from flask import render_template, request, session, redirect, url_for, flash, abort
+from flask import (
+    current_app,
+    render_template,
+    request,
+    session,
+    redirect,
+    url_for,
+    flash,
+    abort,
+)
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
+
 from extensions import db
 from front import front_bp
 from services.auth_service import login_required
@@ -12,9 +24,15 @@ from helpers.auth import current_user
 from helpers.upload import save_user_image, delete_profile_image, get_thumb_name
 from helpers.time import utc_now, to_local
 from helpers.money import format_money
+from helpers.currency import khr_format
 from helpers.telegram import send_telegram
 from models.user import User
 from models.order import Order
+from models.wishlist_item import WishlistItem
+from models.wallet_transaction import WalletTransaction
+from services.khqr_service import generate_khqr
+from services.order_service import cancel_order, cancel_order_by_customer
+from services.wallet_service import create_pending_top_up
 
 
 @front_bp.route('/account', methods=['GET', 'POST'], endpoint='account')
@@ -24,14 +42,14 @@ def account():
     Customer profile overview, profile editing (username, email, avatar),
     and password update with current-password verification.
     """
+    user = current_user()
+    if not user:
+        return redirect(url_for('front_bp.login'))
+
     if request.method == 'POST':
         action = request.form.get('action')
         if action not in ('update_profile', 'change_password'):
             abort(501)
-
-        user = current_user()
-        if not user:
-            return redirect(url_for('front_bp.login'))
 
         if action == 'update_profile':
             username = request.form.get('username', '').strip()
@@ -109,10 +127,6 @@ def account():
             flash("Password updated successfully.", "success")
             return redirect(url_for('front_bp.account'))
 
-    user = current_user()
-    if not user:
-        return redirect(url_for('front_bp.login'))
-
     # Auto-associate orphan guest orders placed with this user's email
     if user.email:
         orphan_orders = Order.query.filter(
@@ -127,15 +141,22 @@ def account():
     # Fetch recent orders summary for customer overview
     recent_orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(5).all()
     total_orders_count = Order.query.filter_by(user_id=user.id).count()
+    wishlist_count = WishlistItem.query.filter_by(user_id=user.id).count()
+    wallet_balance_khr = getattr(user, 'wallet_balance_khr', 0)
 
     return render_template(
-        'front/account/index.html',
+        'front/account/overview.html',
         user=user,
+        orders=recent_orders,
         recent_orders=recent_orders,
+        orders_count=total_orders_count,
         total_orders_count=total_orders_count,
+        wishlist_count=wishlist_count,
+        wallet_balance_khr=wallet_balance_khr,
         to_local=to_local,
         format_money=format_money,
-        module='account'
+        khr_format=khr_format,
+        module='account',
     )
 
 
@@ -194,8 +215,9 @@ def account_orders():
         confirmed_count=confirmed_count,
         to_local=to_local,
         format_money=format_money,
+        khr_format=khr_format,
         utc_now=utc_now,
-        module='account_orders'
+        module='account_orders',
     )
 
 
@@ -204,7 +226,7 @@ def account_orders():
 def account_order_detail(order_number: str):
     """
     Detailed itemized order receipt with shipping details, status timeline,
-    live cancellation grace countdown, and item actions.
+    live cancellation grace countdown, KHQR payment check, and item actions.
     """
     if request.method == 'POST':
         abort(501)
@@ -215,7 +237,6 @@ def account_order_detail(order_number: str):
 
     order = Order.query.filter_by(order_number=order_number, user_id=user.id).first()
     if not order and user.email:
-        # Check if order was placed as guest with the customer's registered email
         guest_order = Order.query.filter(
             Order.order_number == order_number,
             Order.user_id.is_(None),
@@ -239,24 +260,31 @@ def account_order_detail(order_number: str):
         can_cancel = False
         time_remaining_seconds = 0
 
+    payment_ref = getattr(order, 'payment_reference', None) or getattr(order, 'bakong_hash', None)
+    payment_check_url = url_for('api_bp.payment_check', payment_hash=payment_ref) if payment_ref else None
+
     return render_template(
         'front/account/order_detail.html',
         user=user,
         order=order,
         can_cancel=can_cancel,
         time_remaining_seconds=time_remaining_seconds,
+        payment_check_url=payment_check_url,
+        wallet_balance_khr=getattr(user, 'wallet_balance_khr', 0),
         to_local=to_local,
         format_money=format_money,
-        module='account_order_detail'
+        khr_format=khr_format,
+        module='account_order_detail',
     )
 
 
 @front_bp.route('/account/orders/<order_number>/cancel', methods=['POST'], endpoint='account_order_cancel')
 @front_bp.route('/account/orders/<int:order_id>/cancel', methods=['POST'], endpoint='account_order_cancel_by_id')
+@front_bp.post('/account/orders/<order_number>/cancel', endpoint='account_cancel_order')
 @login_required
 def account_order_cancel(order_number: str = None, order_id: int = None):
     """
-    Cancel a pending order within the 4-hour window, restoring inventory and notifying admin.
+    Cancel a pending order within the 4-hour window, restoring inventory and refunding wallet/account.
     Supports lookup by either alphanumeric order_number or integer order_id.
     """
     user = current_user()
@@ -276,7 +304,6 @@ def account_order_cancel(order_number: str = None, order_id: int = None):
         order = Order.query.filter_by(order_number=target, user_id=user.id).first()
 
     if not order and user.email:
-        # Check if order was placed as guest with the customer's registered email
         guest_q = Order.query.filter(
             Order.user_id.is_(None),
             db.func.lower(Order.email) == user.email.lower()
@@ -294,49 +321,80 @@ def account_order_cancel(order_number: str = None, order_id: int = None):
     if not order:
         abort(404)
 
-    if order.status != 'pending':
-        flash("Only pending orders can be cancelled.", "error")
-        return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
-
-    time_since_creation = (utc_now() - order.created_at).total_seconds()
-    if time_since_creation > (4 * 3600):
-        flash("The 4-hour cancellation window for this order has expired.", "error")
-        return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
-
-    # Mark as cancelled
-    order.status = 'cancelled'
-    order.cancelled_at = utc_now()
-
-    # Attempt to restore inventory stock
     try:
-        from services.stock_service import restore_stock
-        for item in order.items:
-            if item.variant_id:
-                try:
-                    restore_stock(item.variant_id, item.qty)
-                except (NotImplementedError, Exception):
-                    pass
-    except ImportError:
-        pass
+        cancel_order_by_customer(order.id, user_id=user.id)
+        db.session.commit()
+        flash(f"Order #{order.order_number} has been cancelled successfully. Any eligible refund has been returned to your wallet.", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception("Unable to cancel customer order %s.", target)
+        abort(500)
 
-    # Attempt wallet refund if user balance exists
-    if hasattr(user, 'balance') and order.total_cents:
-        try:
-            user.balance = (user.balance or 0) + order.total_cents
-        except Exception:
-            pass
-
-    db.session.commit()
-
-    # Asynchronous Telegram alert (non-blocking)
-    alert_msg = (
-        f"🚫 <b>Order Cancelled by Customer</b>\n"
-        f"• Order: <code>#{order.order_number}</code>\n"
-        f"• Customer: {user.username} ({user.email})\n"
-        f"• Amount: {format_money(order.total_cents)}\n"
-        f"• Reason: Customer self-service cancellation within 4h grace period"
-    )
-    send_telegram(alert_msg)
-
-    flash(f"Order #{order.order_number} has been cancelled successfully.", "success")
     return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
+
+
+@front_bp.route('/account/wallet', methods=['GET', 'POST'], endpoint='account_wallet')
+@login_required
+def account_wallet():
+    """Customer wallet dashboard and Bakong KHQR top-up."""
+    user = current_user()
+    if user is None:
+        return redirect(url_for('front_bp.login'))
+
+    khqr_payment = None
+    payment_check_url = None
+
+    if request.method == 'POST':
+        try:
+            amount_khr = int(request.form.get('amount_khr', ''))
+            if amount_khr <= 0:
+                raise ValueError('Enter a top-up amount greater than zero KHR.')
+            reference = f'WALLET-{user.id}-{uuid.uuid4().hex[:16]}'
+            khqr_payment = generate_khqr(reference=reference, amount_khr=amount_khr)
+            create_pending_top_up(user.id, amount_khr, khqr_payment['reference_md5'])
+            db.session.commit()
+            payment_check_url = url_for(
+                'api_bp.payment_check',
+                payment_hash=khqr_payment['reference_md5'],
+            )
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), 'error')
+        except RuntimeError:
+            db.session.rollback()
+            current_app.logger.exception('Unable to generate wallet top-up KHQR.')
+            flash('Unable to create a top-up QR right now. Please try again.', 'error')
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.logger.exception('Unable to start customer wallet top-up.')
+            abort(500)
+
+    transactions = WalletTransaction.query.filter_by(
+        user_id=user.id,
+        status='completed',
+    ).order_by(WalletTransaction.created_at.desc()).limit(50).all()
+
+    pending_topup_references = [
+        transaction.reference
+        for transaction in WalletTransaction.query.filter_by(
+            user_id=user.id,
+            transaction_type='top_up',
+            status='pending',
+        ).all()
+        if not khqr_payment or transaction.reference != khqr_payment['reference_md5']
+    ]
+
+    return render_template(
+        'front/account/wallet.html',
+        user=user,
+        transactions=transactions,
+        khqr_payment=khqr_payment,
+        payment_check_url=payment_check_url,
+        pending_topup_references=pending_topup_references,
+        wallet_balance_khr=getattr(user, 'wallet_balance_khr', 0),
+        khr_format=khr_format,
+        to_local=to_local,
+    )
