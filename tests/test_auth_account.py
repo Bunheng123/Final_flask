@@ -176,7 +176,7 @@ def test_customer_order_history_and_cancel_grace_period(client):
     # View order detail
     res_det = client.get('/account/orders/ORD-TEST-001')
     assert res_det.status_code == 200
-    assert b"4-Hour Grace Period Active" in res_det.data
+    assert b"Cancellation Window Active" in res_det.data
 
     # Cancel order within grace period
     res_cancel = client.post('/account/orders/ORD-TEST-001/cancel', follow_redirects=True)
@@ -185,6 +185,64 @@ def test_customer_order_history_and_cancel_grace_period(client):
 
     updated = Order.query.filter_by(order_number='ORD-TEST-001').first()
     assert updated.status == 'cancelled'
+
+
+def test_customer_order_history_filters_and_search(client):
+    """Customer order history filtering by status and searching by order number."""
+    # Seed orders with different statuses for user 2
+    order_pending = Order(
+        order_number='ORD-FILTER-P1',
+        user_id=2,
+        customer_name='Test User',
+        email='user@techstore.test',
+        phone='012345678',
+        address='Phnom Penh, Cambodia',
+        payment_method='cod',
+        status='pending',
+        subtotal_cents=1000,
+        total_cents=1000,
+        created_at=utc_now()
+    )
+    order_delivered = Order(
+        order_number='ORD-FILTER-D1',
+        user_id=2,
+        customer_name='Test User',
+        email='user@techstore.test',
+        phone='012345678',
+        address='Phnom Penh, Cambodia',
+        payment_method='khqr',
+        status='delivered',
+        subtotal_cents=2500,
+        total_cents=2500,
+        created_at=utc_now()
+    )
+    db.session.add_all([order_pending, order_delivered])
+    db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 2
+        sess['username'] = 'test_user'
+        sess['email'] = 'user@techstore.test'
+        sess['role'] = 'user'
+
+    # Filter status=pending
+    res_pending = client.get('/account/orders?status=pending')
+    assert res_pending.status_code == 200
+    assert b"ORD-FILTER-P1" in res_pending.data
+    assert b"ORD-FILTER-D1" not in res_pending.data
+
+    # Filter status=delivered
+    res_delivered = client.get('/account/orders?status=delivered')
+    assert res_delivered.status_code == 200
+    assert b"ORD-FILTER-D1" in res_delivered.data
+    assert b"ORD-FILTER-P1" not in res_delivered.data
+
+    # Search by order number query
+    res_search = client.get('/account/orders?q=FILTER-P1')
+    assert res_search.status_code == 200
+    assert b"ORD-FILTER-P1" in res_search.data
+    assert b"ORD-FILTER-D1" not in res_search.data
 
 
 def test_customer_order_cancel_expired_rejected(client):

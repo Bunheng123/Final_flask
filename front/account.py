@@ -132,7 +132,7 @@ def account():
 @login_required
 def account_orders():
     """
-    List of orders placed by the current customer with statuses and date stamps.
+    List of orders placed by the current customer with filters, search, and status counters.
     """
     if request.method == 'POST':
         abort(501)
@@ -141,14 +141,38 @@ def account_orders():
     if not user:
         return redirect(url_for('front_bp.login'))
 
-    orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).all()
+    status_filter = request.args.get('status', 'all').lower()
+    search_q = request.args.get('q', '').strip()
+
+    query = Order.query.filter_by(user_id=user.id)
+    if status_filter in ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled'):
+        query = query.filter_by(status=status_filter)
+    if search_q:
+        query = query.filter(Order.order_number.ilike(f"%{search_q}%"))
+
+    orders = query.order_by(Order.created_at.desc()).all()
+
+    # User statistics for overview metric cards
+    all_user_orders = Order.query.filter_by(user_id=user.id).all()
+    total_spent_cents = sum(o.total_cents for o in all_user_orders if o.status != 'cancelled')
+    pending_count = sum(1 for o in all_user_orders if o.status == 'pending')
+    delivered_count = sum(1 for o in all_user_orders if o.status == 'delivered')
+    confirmed_count = sum(1 for o in all_user_orders if o.status in ('confirmed', 'shipped'))
 
     return render_template(
         'front/account/orders.html',
         user=user,
         orders=orders,
+        status_filter=status_filter,
+        search_q=search_q,
+        total_spent_cents=total_spent_cents,
+        total_orders_count=len(all_user_orders),
+        pending_count=pending_count,
+        delivered_count=delivered_count,
+        confirmed_count=confirmed_count,
         to_local=to_local,
         format_money=format_money,
+        utc_now=utc_now,
         module='account_orders'
     )
 
@@ -158,7 +182,7 @@ def account_orders():
 def account_order_detail(order_number: str):
     """
     Detailed itemized order receipt with shipping details, status timeline,
-    and 4-hour cancellation self-service window.
+    live cancellation grace countdown, and item actions.
     """
     if request.method == 'POST':
         abort(501)
