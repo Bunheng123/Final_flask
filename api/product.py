@@ -1,6 +1,42 @@
+"""
+API Product Endpoints.
+Owner: Workstream A / Member 2 (Catalog & Product Variants)
+"""
 from flask import jsonify, request
 from api import api_bp
-from product import products, get_product_by_id, get_product_by_category
+from services import stock_service
+from helpers.money import from_cents
+
+
+def _serialize_product(p):
+    active_vars = [v for v in p.variants if v.is_active]
+    default_var = next((v for v in active_vars if v.spec_name.lower() == 'default'), active_vars[0]) if active_vars else None
+    price = from_cents(default_var.price_cents) if default_var else 0.0
+    stock = sum(v.stock for v in active_vars) if active_vars else 0
+    cat_name = p.category.name if p.category else ""
+
+    return {
+        "id": p.id,
+        "name": p.name,
+        "description": p.description,
+        "category": cat_name,
+        "image": p.image,
+        "price": price,
+        "stock": stock,
+        "variants": [
+            {
+                "id": v.id,
+                "sku": v.sku,
+                "spec_name": v.spec_name,
+                "price": from_cents(v.price_cents),
+                "price_cents": v.price_cents,
+                "stock": v.stock,
+                "low_stock_threshold": v.low_stock_threshold,
+                "is_active": v.is_active
+            }
+            for v in active_vars
+        ]
+    }
 
 
 @api_bp.get('/products', endpoint='get_products')
@@ -9,7 +45,24 @@ def api_products():
     category = request.args.get('category')
     search = request.args.get('q')
 
-    result = products
+    db_products = stock_service.get_active_products(search=search)
+    if category:
+        db_products = [
+            p for p in db_products
+            if p.category and p.category.name.lower() == category.lower()
+        ]
+
+    if db_products:
+        result = [_serialize_product(p) for p in db_products]
+        return jsonify({
+            "success": True,
+            "count": len(result),
+            "data": result
+        })
+
+    # Fallback to mock catalog for unseeded environments / tests
+    from product import products as mock_products
+    result = mock_products
     if category:
         result = [p for p in result if p.get('category', '').lower() == category.lower()]
     if search:
@@ -29,9 +82,18 @@ def api_products():
 
 @api_bp.get('/products/<int:product_id>', endpoint='get_product_by_id')
 @api_bp.get('/product/<int:product_id>', endpoint='get_product_detail')
-def api_product_detail(product_id):
-    product = get_product_by_id(product_id)
-    if not product:
+def api_product_detail(product_id: int):
+    p = stock_service.get_product_by_id(product_id, only_active=True)
+    if p:
+        return jsonify({
+            "success": True,
+            "data": _serialize_product(p)
+        })
+
+    # Fallback to mock catalog
+    from product import get_product_by_id as mock_get_by_id
+    mock_p = mock_get_by_id(product_id)
+    if not mock_p:
         return jsonify({
             "success": False,
             "error": "Product not found"
@@ -39,13 +101,23 @@ def api_product_detail(product_id):
 
     return jsonify({
         "success": True,
-        "data": product
+        "data": mock_p
     })
 
 
 @api_bp.get('/products/categories', endpoint='get_product_categories')
 def api_product_categories():
-    categories = sorted(list({p.get('category') for p in products if p.get('category')}))
+    from models.category import Category
+    db_cats = Category.query.order_by(Category.name.asc()).all()
+    if db_cats:
+        cats = [c.name for c in db_cats]
+        return jsonify({
+            "success": True,
+            "categories": cats
+        })
+
+    from product import products as mock_products
+    categories = sorted(list({p.get('category') for p in mock_products if p.get('category')}))
     return jsonify({
         "success": True,
         "categories": categories

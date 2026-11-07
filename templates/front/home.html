@@ -98,7 +98,7 @@
 
         <!-- Category -->
         <span class="absolute top-4 left-4 bg-white/10 backdrop-blur-lg border border-white/10 text-white text-xs px-4 py-1.5 rounded-full">
-          {{ product.category }}
+          {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
         </span>
 
       </a>
@@ -128,7 +128,7 @@
             </p>
 
             <p class="text-2xl font-bold text-white">
-              ${{ product.price }}
+              {% if product.price_formatted %}{{ product.price_formatted }}{% else %}${{ product.price }}{% endif %}
             </p>
           </div>
 
