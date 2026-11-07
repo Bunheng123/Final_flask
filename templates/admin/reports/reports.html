@@ -81,7 +81,7 @@
       <div>
         <div class="font-mono text-2xl font-bold text-text">{{ sales.gross_sales_formatted }}</div>
         <div class="text-[11px] text-text-muted mt-1">
-          From {{ sales.total_orders }} total recorded orders
+          From {{ sales.total_orders }} recorded orders
         </div>
       </div>
     </div>
@@ -113,7 +113,7 @@
       <div>
         <div class="font-mono text-2xl font-bold text-text">-{{ sales.discount_formatted }}</div>
         <div class="text-[11px] text-amber font-medium mt-1">
-          Applied promotional coupons
+          Applied promo coupons
         </div>
       </div>
     </div>
@@ -135,178 +135,262 @@
     </div>
   </div>
 
-  <!-- Section 1: Recent Orders & Invoices -->
+  <!-- Unified Accounting & Sales Ledger (All-in-One Component) -->
   <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-    <div class="p-5 border-b border-border flex items-center justify-between">
-      <div>
-        <h3 class="font-bold text-sm text-text">Orders & Downloadable Invoices</h3>
-        <p class="text-[11px] text-text-muted">Directly preview and download PDF invoices for recorded customer orders.</p>
-      </div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse text-xs">
-        <thead>
-          <tr class="border-b border-border bg-paper/50 text-[11px] uppercase tracking-wider text-text-muted font-bold">
-            <th class="py-3.5 px-5">Order #</th>
-            <th class="py-3.5 px-5">Date</th>
-            <th class="py-3.5 px-5">Customer</th>
-            <th class="py-3.5 px-5">Status</th>
-            <th class="py-3.5 px-5 text-right">Total</th>
-            <th class="py-3.5 px-5 text-right">Invoice</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border text-text">
-          {% if sales.orders %}
-            {% for o in sales.orders %}
-            <tr class="hover:bg-paper/40 transition">
-              <td class="py-3.5 px-5 font-mono font-bold text-violet">{{ o.order_number }}</td>
-              <td class="py-3.5 px-5 text-text-muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '—' }}</td>
-              <td class="py-3.5 px-5 font-medium">{{ o.customer_name }}</td>
-              <td class="py-3.5 px-5">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border {% if o.status in ['confirmed', 'delivered'] %}bg-teal-light text-teal border-teal/20{% elif o.status == 'cancelled' %}bg-rose-light text-rose border-rose/20{% else %}bg-amber-light text-amber border-amber/20{% endif %}">
-                  {{ o.status|upper }}
-                </span>
-              </td>
-              <td class="py-3.5 px-5 text-right font-mono font-bold">${{ "%.2f"|format(o.total_cents / 100) }}</td>
-              <td class="py-3.5 px-5 text-right">
-                <a
-                  href="{{ url_for('front_bp.download_invoice', order_id=o.id) }}"
-                  target="_blank"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet/10 hover:bg-violet/20 text-violet font-semibold text-[11px] transition"
-                  title="Download PDF Invoice"
-                >
-                  <i class="bi bi-file-earmark-pdf-fill text-rose"></i> Download PDF
-                </a>
-              </td>
-            </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="6" class="text-center py-8 text-text-muted">No orders found for this date range.</td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+    <!-- Component Tab Header -->
+    <div class="border-b border-border bg-paper/40 px-5 pt-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-1 sm:gap-2">
+        <button
+          type="button"
+          id="btnTabOrders"
+          onclick="switchReportTab('orders')"
+          class="report-tab-btn active px-4 py-2.5 text-xs font-bold border-b-2 border-violet text-violet flex items-center gap-2 transition"
+        >
+          <i class="bi bi-receipt"></i>
+          <span>Orders & Invoices</span>
+          <span class="bg-violet/10 text-violet px-2 py-0.5 rounded-full text-[10px] font-mono">{{ sales.total_orders }}</span>
+        </button>
 
-  <!-- Section 2: Daily Sales & Accounting Breakdown Table -->
-  <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-    <div class="p-5 border-b border-border flex items-center justify-between">
-      <div>
-        <h3 class="font-bold text-sm text-text">Daily Sales & Accounting Breakdown</h3>
-        <p class="text-[11px] text-text-muted">Aggregated financial velocity grouped by calendar date.</p>
-      </div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse text-xs">
-        <thead>
-          <tr class="border-b border-border bg-paper/50 text-[11px] uppercase tracking-wider text-text-muted font-bold">
-            <th class="py-3.5 px-5">Date</th>
-            <th class="py-3.5 px-5">Orders Placed</th>
-            <th class="py-3.5 px-5">Completed Orders</th>
-            <th class="py-3.5 px-5 text-right">Gross Sales</th>
-            <th class="py-3.5 px-5 text-right">Discounts</th>
-            <th class="py-3.5 px-5 text-right">Net Realized</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border text-text">
-          {% if sales.daily_breakdown %}
-            {% for d in sales.daily_breakdown %}
-            <tr class="hover:bg-paper/40 transition">
-              <td class="py-3.5 px-5 font-mono font-bold">{{ d.date }}</td>
-              <td class="py-3.5 px-5">{{ d.orders_count }}</td>
-              <td class="py-3.5 px-5">
-                <span class="inline-flex items-center gap-1 font-semibold text-teal">
-                  <i class="bi bi-check-circle-fill text-[10px]"></i> {{ d.completed_count }}
-                </span>
-              </td>
-              <td class="py-3.5 px-5 text-right font-mono">${{ "%.2f"|format(d.gross_cents / 100) }}</td>
-              <td class="py-3.5 px-5 text-right font-mono text-amber">-${{ "%.2f"|format(d.discount_cents / 100) }}</td>
-              <td class="py-3.5 px-5 text-right font-mono font-bold text-teal">${{ "%.2f"|format(d.net_cents / 100) }}</td>
-            </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="6" class="text-center py-8 text-text-muted">No sales recorded for this date range.</td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+        <button
+          type="button"
+          id="btnTabDaily"
+          onclick="switchReportTab('daily')"
+          class="report-tab-btn px-4 py-2.5 text-xs font-semibold text-text-muted hover:text-text border-b-2 border-transparent flex items-center gap-2 transition"
+        >
+          <i class="bi bi-calendar-event"></i>
+          <span>Daily Breakdown</span>
+          <span class="bg-paper text-text-muted px-2 py-0.5 rounded-full text-[10px] font-mono">{{ sales.daily_breakdown|length }}</span>
+        </button>
 
-  <!-- Section 2: Warehouse Inventory Stock Valuation -->
-  <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-    <div class="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-      <div>
-        <h3 class="font-bold text-sm text-text">Live Warehouse Inventory Stock Valuation</h3>
-        <p class="text-[11px] text-text-muted">
-          Retail and cost valuations for active variants. Potential profit margin: 
-          <span class="font-semibold text-teal">{{ inventory.potential_profit_formatted }}</span>
-        </p>
+        <button
+          type="button"
+          id="btnTabInventory"
+          onclick="switchReportTab('inventory')"
+          class="report-tab-btn px-4 py-2.5 text-xs font-semibold text-text-muted hover:text-text border-b-2 border-transparent flex items-center gap-2 transition"
+        >
+          <i class="bi bi-boxes"></i>
+          <span>Inventory Valuation</span>
+          <span class="bg-paper text-text-muted px-2 py-0.5 rounded-full text-[10px] font-mono">{{ inventory.total_skus }}</span>
+        </button>
       </div>
-      <div class="flex gap-2 text-xs">
-        <span class="bg-amber-light text-amber border border-amber/20 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5">
-          <i class="bi bi-exclamation-triangle-fill"></i> Low Stock: {{ inventory.low_stock_count }}
-        </span>
-        <span class="bg-rose-light text-rose border border-rose/20 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5">
-          <i class="bi bi-x-circle-fill"></i> Out of Stock: {{ inventory.out_of_stock_count }}
-        </span>
+
+      <div class="text-[11px] text-text-muted pb-2 hidden sm:block">
+        Accounting Ledger Mode
       </div>
     </div>
-    <div class="overflow-x-auto max-h-[450px]">
-      <table class="w-full text-left border-collapse text-xs">
-        <thead class="sticky top-0 z-10">
-          <tr class="border-b border-border bg-paper text-[11px] uppercase tracking-wider text-text-muted font-bold">
-            <th class="py-3.5 px-5">SKU</th>
-            <th class="py-3.5 px-5">Product Name</th>
-            <th class="py-3.5 px-5">Specification</th>
-            <th class="py-3.5 px-5 text-center">Stock Units</th>
-            <th class="py-3.5 px-5 text-right">Retail Price</th>
-            <th class="py-3.5 px-5 text-right">Est. Cost</th>
-            <th class="py-3.5 px-5 text-right">Valuation</th>
-            <th class="py-3.5 px-5 text-center">Status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border text-text">
-          {% if inventory.variant_items %}
-            {% for item in inventory.variant_items %}
-            <tr class="hover:bg-paper/40 transition">
-              <td class="py-3 px-5 font-mono font-bold text-violet">{{ item.sku }}</td>
-              <td class="py-3 px-5 font-semibold">{{ item.product_name }}</td>
-              <td class="py-3 px-5 text-text-muted">{{ item.spec_name }}</td>
-              <td class="py-3 px-5 text-center font-mono font-bold">
-                {{ item.stock }}
-              </td>
-              <td class="py-3 px-5 text-right font-mono">{{ item.price_formatted }}</td>
-              <td class="py-3 px-5 text-right font-mono text-text-muted">{{ item.cost_formatted }}</td>
-              <td class="py-3 px-5 text-right font-mono font-bold text-text">{{ item.valuation_formatted }}</td>
-              <td class="py-3 px-5 text-center">
-                {% if item.is_out_of_stock %}
-                  <span class="bg-rose-light text-rose border border-rose/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    Out of Stock
-                  </span>
-                {% elif item.is_low_stock %}
-                  <span class="bg-amber-light text-amber border border-amber/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    Low Stock
-                  </span>
-                {% else %}
-                  <span class="bg-teal-light text-teal border border-teal/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    In Stock
-                  </span>
-                {% endif %}
-              </td>
+
+    <!-- TAB 1: Individual Orders & Downloadable Invoices -->
+    <div id="tabContentOrders" class="report-tab-content block">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="border-b border-border bg-paper/50 text-[11px] uppercase tracking-wider text-text-muted font-bold">
+              <th class="py-3.5 px-5">Order #</th>
+              <th class="py-3.5 px-5">Date</th>
+              <th class="py-3.5 px-5">Customer</th>
+              <th class="py-3.5 px-5">Payment</th>
+              <th class="py-3.5 px-5">Status</th>
+              <th class="py-3.5 px-5 text-right">Subtotal</th>
+              <th class="py-3.5 px-5 text-right">Discount</th>
+              <th class="py-3.5 px-5 text-right">Net Total</th>
+              <th class="py-3.5 px-5 text-right">Invoice</th>
             </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="8" class="text-center py-8 text-text-muted">No product variants in catalog.</td>
+          </thead>
+          <tbody class="divide-y divide-border text-text">
+            {% if sales.orders %}
+              {% for o in sales.orders %}
+              <tr class="hover:bg-paper/40 transition">
+                <td class="py-3.5 px-5 font-mono font-bold text-violet">{{ o.order_number }}</td>
+                <td class="py-3.5 px-5 text-text-muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '—' }}</td>
+                <td class="py-3.5 px-5">
+                  <div class="font-medium text-text">{{ o.customer_name }}</div>
+                  <div class="text-[10px] text-text-muted">{{ o.email }}</div>
+                </td>
+                <td class="py-3.5 px-5 text-text-muted uppercase text-[11px]">{{ o.payment_method }}</td>
+                <td class="py-3.5 px-5">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border {% if o.status in ['confirmed', 'delivered'] %}bg-teal-light text-teal border-teal/20{% elif o.status == 'cancelled' %}bg-rose-light text-rose border-rose/20{% else %}bg-amber-light text-amber border-amber/20{% endif %}">
+                    {{ o.status|upper }}
+                  </span>
+                </td>
+                <td class="py-3.5 px-5 text-right font-mono">${{ "%.2f"|format(o.subtotal_cents / 100) }}</td>
+                <td class="py-3.5 px-5 text-right font-mono text-amber">
+                  {% if o.discount_cents > 0 %}
+                    -${{ "%.2f"|format(o.discount_cents / 100) }}
+                  {% else %}
+                    $0.00
+                  {% endif %}
+                </td>
+                <td class="py-3.5 px-5 text-right font-mono font-bold text-text">${{ "%.2f"|format(o.total_cents / 100) }}</td>
+                <td class="py-3.5 px-5 text-right">
+                  <a
+                    href="{{ url_for('front_bp.download_invoice', order_id=o.id) }}"
+                    target="_blank"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet/10 hover:bg-violet text-violet hover:text-white font-semibold text-[11px] transition shadow-sm"
+                    title="Download Official PDF Invoice"
+                  >
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" class="text-center py-10 text-text-muted text-xs">
+                  <i class="bi bi-receipt text-3xl mb-2 block text-text-muted/40"></i>
+                  No orders recorded for this date range.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: Daily Sales & Accounting Breakdown -->
+    <div id="tabContentDaily" class="report-tab-content hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="border-b border-border bg-paper/50 text-[11px] uppercase tracking-wider text-text-muted font-bold">
+              <th class="py-3.5 px-5">Date</th>
+              <th class="py-3.5 px-5">Orders Placed</th>
+              <th class="py-3.5 px-5">Completed Orders</th>
+              <th class="py-3.5 px-5 text-right">Gross Sales</th>
+              <th class="py-3.5 px-5 text-right">Discounts Given</th>
+              <th class="py-3.5 px-5 text-right">Net Realized Revenue</th>
             </tr>
-          {% endif %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="divide-y divide-border text-text">
+            {% if sales.daily_breakdown %}
+              {% for d in sales.daily_breakdown %}
+              <tr class="hover:bg-paper/40 transition">
+                <td class="py-3.5 px-5 font-mono font-bold">{{ d.date }}</td>
+                <td class="py-3.5 px-5">{{ d.orders_count }}</td>
+                <td class="py-3.5 px-5">
+                  <span class="inline-flex items-center gap-1 font-semibold text-teal">
+                    <i class="bi bi-check-circle-fill text-[10px]"></i> {{ d.completed_count }}
+                  </span>
+                </td>
+                <td class="py-3.5 px-5 text-right font-mono">${{ "%.2f"|format(d.gross_cents / 100) }}</td>
+                <td class="py-3.5 px-5 text-right font-mono text-amber">-${{ "%.2f"|format(d.discount_cents / 100) }}</td>
+                <td class="py-3.5 px-5 text-right font-mono font-bold text-teal">${{ "%.2f"|format(d.net_cents / 100) }}</td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="6" class="text-center py-10 text-text-muted text-xs">
+                  No daily sales records found for this period.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: Warehouse Inventory Stock Valuation -->
+    <div id="tabContentInventory" class="report-tab-content hidden">
+      <div class="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-paper/20">
+        <div class="text-xs text-text-muted">
+          Estimated profit margin across current stock: 
+          <span class="font-bold text-teal">{{ inventory.potential_profit_formatted }}</span>
+        </div>
+        <div class="flex gap-2 text-xs">
+          <span class="bg-amber-light text-amber border border-amber/20 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
+            <i class="bi bi-exclamation-triangle-fill"></i> Low Stock: {{ inventory.low_stock_count }}
+          </span>
+          <span class="bg-rose-light text-rose border border-rose/20 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
+            <i class="bi bi-x-circle-fill"></i> Out of Stock: {{ inventory.out_of_stock_count }}
+          </span>
+        </div>
+      </div>
+      <div class="overflow-x-auto max-h-[480px]">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="sticky top-0 z-10">
+            <tr class="border-b border-border bg-paper text-[11px] uppercase tracking-wider text-text-muted font-bold">
+              <th class="py-3.5 px-5">SKU</th>
+              <th class="py-3.5 px-5">Product Name</th>
+              <th class="py-3.5 px-5">Specification</th>
+              <th class="py-3.5 px-5 text-center">Stock Units</th>
+              <th class="py-3.5 px-5 text-right">Retail Price</th>
+              <th class="py-3.5 px-5 text-right">Est. Cost</th>
+              <th class="py-3.5 px-5 text-right">Valuation</th>
+              <th class="py-3.5 px-5 text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border text-text">
+            {% if inventory.variant_items %}
+              {% for item in inventory.variant_items %}
+              <tr class="hover:bg-paper/40 transition">
+                <td class="py-3 px-5 font-mono font-bold text-violet">{{ item.sku }}</td>
+                <td class="py-3 px-5 font-semibold">{{ item.product_name }}</td>
+                <td class="py-3 px-5 text-text-muted">{{ item.spec_name }}</td>
+                <td class="py-3 px-5 text-center font-mono font-bold">{{ item.stock }}</td>
+                <td class="py-3 px-5 text-right font-mono">{{ item.price_formatted }}</td>
+                <td class="py-3 px-5 text-right font-mono text-text-muted">{{ item.cost_formatted }}</td>
+                <td class="py-3 px-5 text-right font-mono font-bold text-text">{{ item.valuation_formatted }}</td>
+                <td class="py-3 px-5 text-center">
+                  {% if item.is_out_of_stock %}
+                    <span class="bg-rose-light text-rose border border-rose/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      Out of Stock
+                    </span>
+                  {% elif item.is_low_stock %}
+                    <span class="bg-amber-light text-amber border border-amber/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      Low Stock
+                    </span>
+                  {% else %}
+                    <span class="bg-teal-light text-teal border border-teal/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      In Stock
+                    </span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" class="text-center py-8 text-text-muted">No product variants found in warehouse.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
+
+<script>
+function switchReportTab(tabKey) {
+  // Update button active styles
+  document.querySelectorAll('.report-tab-btn').forEach(btn => {
+    btn.classList.remove('active', 'border-violet', 'text-violet', 'font-bold');
+    btn.classList.add('border-transparent', 'text-text-muted', 'font-semibold');
+  });
+
+  // Hide all contents
+  document.querySelectorAll('.report-tab-content').forEach(content => {
+    content.classList.add('hidden');
+    content.classList.remove('block');
+  });
+
+  if (tabKey === 'orders') {
+    const btn = document.getElementById('btnTabOrders');
+    btn.classList.add('active', 'border-violet', 'text-violet', 'font-bold');
+    btn.classList.remove('border-transparent', 'text-text-muted', 'font-semibold');
+    document.getElementById('tabContentOrders').classList.remove('hidden');
+    document.getElementById('tabContentOrders').classList.add('block');
+  } else if (tabKey === 'daily') {
+    const btn = document.getElementById('btnTabDaily');
+    btn.classList.add('active', 'border-violet', 'text-violet', 'font-bold');
+    btn.classList.remove('border-transparent', 'text-text-muted', 'font-semibold');
+    document.getElementById('tabContentDaily').classList.remove('hidden');
+    document.getElementById('tabContentDaily').classList.add('block');
+  } else if (tabKey === 'inventory') {
+    const btn = document.getElementById('btnTabInventory');
+    btn.classList.add('active', 'border-violet', 'text-violet', 'font-bold');
+    btn.classList.remove('border-transparent', 'text-text-muted', 'font-semibold');
+    document.getElementById('tabContentInventory').classList.remove('hidden');
+    document.getElementById('tabContentInventory').classList.add('block');
+  }
+}
+</script>
 {% endblock %}
