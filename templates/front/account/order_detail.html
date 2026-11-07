@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% include 'front/share/header.html' %}
+    <title>Order #{{ order.order_number }} — TechStore</title>
+  </head>
+  <body class="bg-[#0b1120] text-slate-200 antialiased min-h-screen flex flex-col font-sans selection:bg-indigo-500/30">
+    <!-- Navbar -->
+    {% include 'front/share/navbar.html' %}
+
+    <main class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full">
+      <!-- Breadcrumb -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pb-4 border-b border-slate-800/80">
+        <div>
+          <a href="{{ url_for('front_bp.account_orders') }}" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 mb-1">
+            &larr; Back to Order History
+          </a>
+          <h1 class="text-3xl font-extrabold text-white flex items-center gap-3">
+            Order #{{ order.order_number }}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold {% if order.status == 'delivered' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% elif order.status == 'cancelled' %}bg-rose-500/20 text-rose-300 border border-rose-500/30{% elif order.status == 'shipped' %}bg-sky-500/20 text-sky-300 border border-sky-500/30{% else %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% endif %}">
+              {{ order.status|capitalize }}
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400 mt-1">Placed on {% if order.created_at %}{{ to_local(order.created_at).strftime('%B %d, %Y at %I:%M %p') }}{% endif %}</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          {% if order.status == 'confirmed' or order.status == 'delivered' or order.status == 'shipped' %}
+            <a href="{{ url_for('front_bp.invoice_pdf', order_number=order.order_number) }}" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition border border-slate-700 flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              PDF Invoice
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-6 space-y-3">
+            {% for category, message in messages %}
+              <div class="p-4 rounded-xl text-sm font-medium flex items-center justify-between {% if category == 'error' %}bg-rose-500/10 border border-rose-500/20 text-rose-300{% else %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-300{% endif %}">
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- 4-Hour Cancellation Banner -->
+      {% if can_cancel %}
+        <div class="mb-8 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-amber-200">4-Hour Grace Period Active</h4>
+              <p class="text-xs text-amber-300/80 mt-0.5">
+                You can self-service cancel this order within 4 hours of placement for a full store credit refund.
+              </p>
+            </div>
+          </div>
+          <form action="{{ url_for('front_bp.account_order_cancel', order_number=order.order_number) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order? Stock will be restored.');" class="shrink-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="w-full sm:w-auto px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              Cancel Order
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
+      <div class="grid lg:grid-cols-3 gap-8">
+        <!-- Itemized Breakdown (2 Cols) -->
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl">
+            <h3 class="text-base font-bold text-white mb-4">Ordered Items</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="text-xs uppercase bg-slate-800/60 text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3 rounded-l-lg">Item</th>
+                    <th class="px-4 py-3">SKU</th>
+                    <th class="px-4 py-3">Price</th>
+                    <th class="px-4 py-3 text-center">Qty</th>
+                    <th class="px-4 py-3 text-right rounded-r-lg">Total</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                  {% for item in order.items %}
+                    <tr class="hover:bg-slate-800/30 transition">
+                      <td class="px-4 py-4">
+                        <div class="font-bold text-white">{{ item.product_name }}</div>
+                        <div class="text-xs text-indigo-400">{{ item.spec_name }}</div>
+                      </td>
+                      <td class="px-4 py-4 text-xs font-mono text-slate-400">{{ item.sku }}</td>
+                      <td class="px-4 py-4 text-sm">{{ format_money(item.unit_price_cents) }}</td>
+                      <td class="px-4 py-4 text-center font-bold text-white">{{ item.qty }}</td>
+                      <td class="px-4 py-4 text-right font-bold text-white">{{ format_money(item.line_total_cents) }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Totals Summary -->
+            <div class="mt-6 pt-6 border-t border-slate-800 space-y-2 text-sm max-w-xs ml-auto">
+              <div class="flex justify-between text-slate-400">
+                <span>Subtotal</span>
+                <span class="text-white font-medium">{{ format_money(order.subtotal_cents) }}</span>
+              </div>
+              {% if order.discount_cents and order.discount_cents > 0 %}
+                <div class="flex justify-between text-emerald-400">
+                  <span>Discount {% if order.coupon_code %}({{ order.coupon_code }}){% endif %}</span>
+                  <span>-{{ format_money(order.discount_cents) }}</span>
+                </div>
+              {% endif %}
+              <div class="flex justify-between text-base font-extrabold text-white pt-2 border-t border-slate-800">
+                <span>Total Due</span>
+                <span class="text-indigo-400">{{ format_money(order.total_cents) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Customer & Delivery Details (1 Col) -->
+        <div class="lg:col-span-1 space-y-6">
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl space-y-4">
+            <h3 class="text-base font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-indigo-400"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Delivery Information
+            </h3>
+            <div class="text-xs space-y-2 text-slate-400">
+              <div>
+                <span class="block text-slate-500 uppercase tracking-wider text-[10px]">Recipient</span>
+                <span class="text-white font-medium">{{ order.customer_name }}</span>
+              </div>
+              <div>
+                <span class="block text-slate-500 uppercase tracking-wider text-[10px]">Email</span>
+                <span class="text-white font-medium">{{ order.email }}</span>
+              </div>
+              <div>
+                <span class="block text-slate-500 uppercase tracking-wider text-[10px]">Phone</span>
+                <span class="text-white font-medium">{{ order.phone }}</span>
+              </div>
+              <div>
+                <span class="block text-slate-500 uppercase tracking-wider text-[10px]">Shipping Address</span>
+                <span class="text-white font-medium">{{ order.address }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl space-y-4">
+            <h3 class="text-base font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-indigo-400"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              Payment Method
+            </h3>
+            <div class="text-xs space-y-2 text-slate-400">
+              <div class="flex justify-between">
+                <span>Method</span>
+                <span class="text-white font-medium uppercase">{{ order.payment_method }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Status</span>
+                <span class="font-semibold {% if order.status == 'cancelled' %}text-rose-400{% else %}text-emerald-400{% endif %}">
+                  {% if order.status == 'cancelled' %}Cancelled{% else %}Paid{% endif %}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    {% include 'front/share/footer.html' %}
+  </body>
+</html>
+

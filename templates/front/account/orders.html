@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% include 'front/share/header.html' %}
+    <title>My Orders — TechStore</title>
+  </head>
+  <body class="bg-[#0b1120] text-slate-200 antialiased min-h-screen flex flex-col font-sans selection:bg-indigo-500/30">
+    <!-- Navbar -->
+    {% include 'front/share/navbar.html' %}
+
+    <main class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pb-4 border-b border-slate-800/80">
+        <div>
+          <a href="{{ url_for('front_bp.account') }}" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 mb-1">
+            &larr; Back to Account
+          </a>
+          <h1 class="text-3xl font-extrabold text-white">Order History</h1>
+        </div>
+        <div class="text-sm text-slate-400">
+          Total orders: <span class="font-bold text-white">{{ orders|length }}</span>
+        </div>
+      </div>
+
+      {% if orders %}
+        <div class="space-y-4">
+          {% for order in orders %}
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl hover:border-slate-700 transition">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                  <span class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  </span>
+                  <div>
+                    <h3 class="text-base font-bold text-white">Order #{{ order.order_number }}</h3>
+                    <p class="text-xs text-slate-400">Placed on {% if order.created_at %}{{ to_local(order.created_at).strftime('%b %d, %Y at %I:%M %p') }}{% endif %}</p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold {% if order.status == 'delivered' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% elif order.status == 'cancelled' %}bg-rose-500/20 text-rose-300 border border-rose-500/30{% elif order.status == 'shipped' %}bg-sky-500/20 text-sky-300 border border-sky-500/30{% else %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% endif %}">
+                    {{ order.status|capitalize }}
+                  </span>
+                  <span class="text-lg font-bold text-white">{{ format_money(order.total_cents) }}</span>
+                  <a href="{{ url_for('front_bp.account_order_detail', order_number=order.order_number) }}" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition">
+                    View Details
+                  </a>
+                </div>
+              </div>
+
+              <!-- Item Preview Pills -->
+              <div class="pt-4 flex flex-wrap gap-2 items-center text-xs text-slate-400">
+                <span class="font-semibold text-slate-300">Items:</span>
+                {% for item in order.items %}
+                  <span class="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700/60 text-slate-300">
+                    {{ item.product_name }} ({{ item.spec_name }}) &times; {{ item.qty }}
+                  </span>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center max-w-md mx-auto">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 flex items-center justify-center mx-auto mb-4 border border-indigo-500/20">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <h3 class="text-xl font-bold text-white">No Orders Found</h3>
+          <p class="text-sm text-slate-400 mt-2 mb-6">You haven't placed any orders yet. Explore our top gadgets and gear!</p>
+          <a href="{{ url_for('front_bp.products') }}" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/30">
+            Start Shopping
+          </a>
+        </div>
+      {% endif %}
+    </main>
+
+    <!-- Footer -->
+    {% include 'front/share/footer.html' %}
+  </body>
+</html>
+
