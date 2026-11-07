@@ -1,0 +1,227 @@
+{% extends 'admin/master.html' %}
+
+{% block tab_title %}Coupons{% endblock %}
+
+{% block content %}
+<div class="w-full">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+      <h2 class="font-display text-2xl font-bold text-text">Coupon & Promo Engine</h2>
+      <p class="text-text-muted text-xs mt-0.5">
+        Manage discount promo codes, usage limits, minimum spend rules, and track customer redemptions.
+      </p>
+    </div>
+    <div class="flex gap-2.5 items-center shrink-0">
+      <a
+        href="{{ url_for('admin_bp.admin_add_coupon') }}"
+        class="inline-flex items-center gap-2 bg-violet hover:bg-[#5b4de8] text-white py-2.5 px-5 rounded-lg font-semibold text-xs transition-all shadow-md shadow-violet/20 hover:shadow-violet/35 shrink-0"
+      >
+        <i class="bi bi-plus-circle-fill"></i> Add Coupon
+      </a>
+    </div>
+  </div>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-6 space-y-2">
+        {% for category, message in messages %}
+          <div class="p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between border {% if category == 'success' %}bg-teal-light text-teal border-teal/20{% else %}bg-rose-light text-rose border-rose/20{% endif %}">
+            <span class="flex items-center gap-2">
+              <i class="bi {% if category == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+              {{ message }}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    <div class="bg-violet-light border border-violet/15 rounded-2xl p-4 flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-violet text-white flex items-center justify-center text-lg shrink-0">
+        <i class="bi bi-ticket-perforated-fill"></i>
+      </div>
+      <div class="flex flex-col leading-tight">
+        <span class="font-mono text-xl font-bold text-text">{{ coupons|length }}</span>
+        <span class="text-xs text-text-muted mt-0.5">Total Coupons</span>
+      </div>
+    </div>
+    <div class="bg-teal-light border border-teal/15 rounded-2xl p-4 flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-teal text-white flex items-center justify-center text-lg shrink-0">
+        <i class="bi bi-check2-circle"></i>
+      </div>
+      <div class="flex flex-col leading-tight">
+        <span class="font-mono text-xl font-bold text-text">{{ coupons|selectattr('is_active')|list|length }}</span>
+        <span class="text-xs text-text-muted mt-0.5">Active Campaigns</span>
+      </div>
+    </div>
+    <div class="bg-amber-light border border-amber/15 rounded-2xl p-4 flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-amber text-white flex items-center justify-center text-lg shrink-0">
+        <i class="bi bi-arrow-repeat"></i>
+      </div>
+      <div class="flex flex-col leading-tight">
+        <span class="font-mono text-xl font-bold text-text">
+          {% set total_used = coupons|map(attribute='used_count')|sum %}
+          {{ total_used }}
+        </span>
+        <span class="text-xs text-text-muted mt-0.5">Total Redemptions</span>
+      </div>
+    </div>
+    <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center text-lg shrink-0">
+        <i class="bi bi-percent"></i>
+      </div>
+      <div class="flex flex-col leading-tight">
+        <span class="font-mono text-xl font-bold text-text">
+          {{ coupons|selectattr('discount_type', 'equalto', 'percent')|list|length }} / {{ coupons|selectattr('discount_type', 'equalto', 'fixed')|list|length }}
+        </span>
+        <span class="text-xs text-text-muted mt-0.5">Percent / Fixed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Filter -->
+  <div class="bg-card border border-border rounded-2xl p-4 mb-6 shadow-sm">
+    <form method="GET" action="{{ url_for('admin_bp.admin_coupons') }}" class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <i class="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-xs"></i>
+        <input
+          type="text"
+          name="q"
+          value="{{ search or '' }}"
+          placeholder="Search by promo code (e.g. WELCOME10)..."
+          class="w-full bg-paper border border-border rounded-xl pl-9 pr-4 py-2.5 text-xs text-text focus:outline-none focus:border-violet transition"
+        />
+      </div>
+      <button
+        type="submit"
+        class="bg-violet hover:bg-[#5b4de8] text-white font-semibold text-xs py-2.5 px-5 rounded-xl transition shadow-sm cursor-pointer"
+      >
+        Filter
+      </button>
+      {% if search %}
+      <a
+        href="{{ url_for('admin_bp.admin_coupons') }}"
+        class="border border-border text-text hover:bg-paper font-semibold text-xs py-2.5 px-4 rounded-xl transition flex items-center justify-center"
+      >
+        Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Coupons Table -->
+  <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="border-b border-border bg-paper/50 text-[11px] uppercase tracking-wider text-text-muted font-bold">
+            <th class="py-3.5 px-5">Code</th>
+            <th class="py-3.5 px-5">Discount</th>
+            <th class="py-3.5 px-5">Min Spend</th>
+            <th class="py-3.5 px-5">Max Discount</th>
+            <th class="py-3.5 px-5">Usage</th>
+            <th class="py-3.5 px-5">Status</th>
+            <th class="py-3.5 px-5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border text-xs text-text">
+          {% if coupons %}
+            {% for c in coupons %}
+            <tr class="hover:bg-paper/40 transition">
+              <td class="py-4 px-5 font-mono font-bold text-violet">
+                <span class="bg-violet/10 border border-violet/20 px-2.5 py-1 rounded-md">
+                  {{ c.code }}
+                </span>
+              </td>
+              <td class="py-4 px-5 font-semibold">
+                {% if c.discount_type == 'percent' %}
+                  {{ c.value }}% OFF
+                {% else %}
+                  ${{ "%.2f"|format(c.value / 100) }} OFF
+                {% endif %}
+              </td>
+              <td class="py-4 px-5 text-text-muted">
+                {% if c.min_spend_cents > 0 %}
+                  ${{ "%.2f"|format(c.min_spend_cents / 100) }}
+                {% else %}
+                  <span class="text-text-muted/60">No Min</span>
+                {% endif %}
+              </td>
+              <td class="py-4 px-5 text-text-muted">
+                {% if c.max_discount_cents %}
+                  ${{ "%.2f"|format(c.max_discount_cents / 100) }}
+                {% else %}
+                  <span class="text-text-muted/60">Unlimited</span>
+                {% endif %}
+              </td>
+              <td class="py-4 px-5">
+                <span class="font-mono font-bold">{{ c.used_count }}</span>
+                <span class="text-text-muted">/ {{ c.usage_limit if c.usage_limit is not none else '∞' }}</span>
+              </td>
+              <td class="py-4 px-5">
+                {% if c.is_active %}
+                  <span class="inline-flex items-center gap-1.5 bg-teal-light text-teal border border-teal/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+                    <span class="w-1.5 h-1.5 rounded-full bg-teal"></span> Active
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1.5 bg-paper text-text-muted border border-border px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Inactive
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-4 px-5 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <!-- Toggle Active -->
+                  <form action="{{ url_for('admin_bp.admin_toggle_coupon', coupon_id=c.id) }}" method="POST" class="inline m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button
+                      type="submit"
+                      class="text-xs p-1.5 rounded-lg border border-border hover:bg-paper transition"
+                      title="{{ 'Deactivate' if c.is_active else 'Activate' }}"
+                    >
+                      <i class="bi {{ 'bi-pause-circle text-amber' if c.is_active else 'bi-play-circle text-teal' }}"></i>
+                    </button>
+                  </form>
+
+                  <!-- Edit -->
+                  <a
+                    href="{{ url_for('admin_bp.admin_edit_coupon', coupon_id=c.id) }}"
+                    class="text-xs p-1.5 rounded-lg border border-border hover:bg-paper text-violet transition"
+                    title="Edit Coupon"
+                  >
+                    <i class="bi bi-pencil-fill"></i>
+                  </a>
+
+                  <!-- Delete -->
+                  <form action="{{ url_for('admin_bp.admin_delete_coupon', coupon_id=c.id) }}" method="POST" class="inline m-0" onsubmit="return confirm('Delete coupon {{ c.code }}? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button
+                      type="submit"
+                      class="text-xs p-1.5 rounded-lg border border-border hover:bg-rose-light text-rose transition cursor-pointer"
+                      title="Delete Coupon"
+                    >
+                      <i class="bi bi-trash-fill"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="7" class="text-center py-12 text-text-muted text-xs">
+                <i class="bi bi-ticket-perforated text-3xl mb-2 block text-text-muted/40"></i>
+                No coupons found matching your criteria.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
