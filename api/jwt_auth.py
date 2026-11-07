@@ -4,7 +4,74 @@ Owner: Developer 5 (Customer Portal, Social Commerce & API Security)
 """
 from functools import wraps
 from datetime import datetime, timezone, timedelta
-import jwt
+try:
+    import jwt
+except ImportError:
+    import base64
+    import json
+    import hmac
+    import hashlib
+
+    class PyJWTError(Exception):
+        pass
+
+    class InvalidTokenError(PyJWTError):
+        pass
+
+    class ExpiredSignatureError(InvalidTokenError):
+        pass
+
+    class _JWTFallback:
+        PyJWTError = PyJWTError
+        InvalidTokenError = InvalidTokenError
+        ExpiredSignatureError = ExpiredSignatureError
+
+        @staticmethod
+        def encode(payload: dict, key: str, algorithm: str = "HS256") -> str:
+            header = {"typ": "JWT", "alg": "HS256"}
+            def _b64(b: bytes) -> str:
+                return base64.urlsafe_b64encode(b).decode("utf-8").rstrip("=")
+
+            h_str = _b64(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+            p_str = _b64(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+            msg = f"{h_str}.{p_str}"
+            sig = hmac.new(key.encode("utf-8") if isinstance(key, str) else key, msg.encode("utf-8"), hashlib.sha256).digest()
+            sig_str = _b64(sig)
+            return f"{msg}.{sig_str}"
+
+        @staticmethod
+        def decode(token: str, key: str, algorithms: list = None) -> dict:
+            parts = token.strip().split(".")
+            if len(parts) != 3:
+                raise InvalidTokenError("Invalid token format")
+
+            def _unb64(s: str) -> bytes:
+                padded = s + "=" * ((4 - len(s) % 4) % 4)
+                return base64.urlsafe_b64decode(padded.encode("utf-8"))
+
+            msg = f"{parts[0]}.{parts[1]}"
+            expected_sig = hmac.new(key.encode("utf-8") if isinstance(key, str) else key, msg.encode("utf-8"), hashlib.sha256).digest()
+            try:
+                actual_sig = _unb64(parts[2])
+            except Exception:
+                raise InvalidTokenError("Invalid signature encoding")
+
+            if not hmac.compare_digest(expected_sig, actual_sig):
+                raise InvalidTokenError("Signature verification failed")
+
+            try:
+                payload = json.loads(_unb64(parts[1]).decode("utf-8"))
+            except Exception:
+                raise InvalidTokenError("Invalid payload JSON")
+
+            if "exp" in payload:
+                now_ts = datetime.now(timezone.utc).timestamp()
+                if payload["exp"] < now_ts:
+                    raise ExpiredSignatureError("Token has expired")
+
+            return payload
+
+    jwt = _JWTFallback()
 from flask import current_app, request, jsonify, g
 from models.user import User
 

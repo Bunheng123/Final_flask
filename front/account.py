@@ -1,69 +1,29 @@
-<<<<<<< HEAD
-from flask import render_template, request, session, abort, redirect, url_for, flash
-=======
 """
 Customer Account & Order History Portal.
-Owner: Developer 5 (Customer Portal, Social Commerce & API Security)
+Owner: Developer 5 (Customer Portal, Social Commerce & API Security) & Workstream C (Orders)
 """
 from datetime import timedelta
 from flask import render_template, request, session, redirect, url_for, flash, abort
 from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
 from front import front_bp
-from extensions import db
 from models.order import Order
 from models.user import User
-from services.auth_service import login_required
-<<<<<<< HEAD
-from helpers.time import utc_now, to_local
-from helpers.money import format_money
-from services.order_service import (
-    is_order_cancellable_by_customer,
-    cancel_order_by_customer
-)
-=======
-from helpers.auth import current_user
+from helpers.auth import login_required, current_user
 from helpers.upload import save_user_image, delete_profile_image, get_thumb_name
 from helpers.time import utc_now, to_local
 from helpers.money import format_money
 from helpers.telegram import send_telegram
-from models.user import User
-from models.order import Order
+from services.order_service import (
+    is_order_cancellable_by_customer,
+    cancel_order_by_customer
+)
 
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
 
 @front_bp.route('/account', methods=['GET', 'POST'], endpoint='account')
 @login_required
 def account():
     """
-<<<<<<< HEAD
-    User account overview and profile management.
-    """
-    if request.method == 'POST':
-        abort(501)
-
-    user_id = session.get('user_id')
-    user = db.session.get(User, user_id) if user_id else None
-    if not user:
-        user = User.query.first() or User(username=session.get('username', 'Customer'), email=session.get('email', ''))
-
-    recent_orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(5).all() if user and user.id else []
-    for o in recent_orders:
-        o.is_cancellable = is_order_cancellable_by_customer(o, max_hours=4)
-
-    user_balance = getattr(user, 'balance', 0.0)
-    if hasattr(user, 'balance_cents'):
-        user_balance = user.balance_cents / 100.0
-
-    return render_template(
-        'front/account/overview.html',
-        user=user,
-        recent_orders=recent_orders,
-        user_balance=user_balance,
-        to_local=to_local,
-        format_money=format_money
-=======
     Customer profile overview, profile editing (username, email, avatar),
     and password update with current-password verification.
     """
@@ -169,6 +129,8 @@ def account():
 
     # Fetch recent orders summary for customer overview
     recent_orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(5).all()
+    for o in recent_orders:
+        o.is_cancellable = is_order_cancellable_by_customer(o, max_hours=4)
     total_orders_count = Order.query.filter_by(user_id=user.id).count()
 
     return render_template(
@@ -179,7 +141,6 @@ def account():
         to_local=to_local,
         format_money=format_money,
         module='account'
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
     )
 
 
@@ -187,28 +148,11 @@ def account():
 @login_required
 def account_orders():
     """
-<<<<<<< HEAD
-    User order history list.
-=======
     List of orders placed by the current customer with filters, search, and status counters.
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
     """
     if request.method == 'POST':
         abort(501)
 
-<<<<<<< HEAD
-    user_id = session.get('user_id')
-    orders = Order.query.filter_by(user_id=user_id).order_by(Order.created_at.desc()).all() if user_id else []
-
-    for order in orders:
-        order.is_cancellable = is_order_cancellable_by_customer(order, max_hours=4)
-
-    return render_template(
-        'front/account/orders.html',
-        orders=orders,
-        to_local=to_local,
-        format_money=format_money
-=======
     user = current_user()
     if not user:
         return redirect(url_for('front_bp.login'))
@@ -234,6 +178,8 @@ def account_orders():
         query = query.filter(Order.order_number.ilike(f"%{search_q}%"))
 
     orders = query.order_by(Order.created_at.desc()).all()
+    for o in orders:
+        o.is_cancellable = is_order_cancellable_by_customer(o, max_hours=4)
 
     # User statistics for overview metric cards
     all_user_orders = Order.query.filter_by(user_id=user.id).all()
@@ -257,7 +203,6 @@ def account_orders():
         format_money=format_money,
         utc_now=utc_now,
         module='account_orders'
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
     )
 
 
@@ -265,59 +210,12 @@ def account_orders():
 @login_required
 def account_order_detail(order_number: str):
     """
-<<<<<<< HEAD
-    User order detail view with 4-hour cancellation window indicator.
-=======
     Detailed itemized order receipt with shipping details, status timeline,
     live cancellation grace countdown, and item actions.
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
     """
     if request.method == 'POST':
         abort(501)
 
-<<<<<<< HEAD
-    user_id = session.get('user_id')
-    order = Order.query.filter_by(order_number=order_number, user_id=user_id).first_or_404()
-
-    is_cancellable = is_order_cancellable_by_customer(order, max_hours=4)
-    remaining_minutes = 0
-    if is_cancellable and order.created_at:
-        elapsed = (utc_now() - order.created_at).total_seconds()
-        remaining_minutes = max(0, int((4 * 3600 - elapsed) / 60))
-
-    return render_template(
-        'front/account/order_detail.html',
-        order=order,
-        is_cancellable=is_cancellable,
-        remaining_minutes=remaining_minutes,
-        to_local=to_local,
-        format_money=format_money
-    )
-
-
-@front_bp.post('/account/orders/<int:order_id>/cancel', endpoint='cancel_customer_order')
-@login_required
-def cancel_customer_order(order_id: int):
-    """
-    Customer self-service cancellation POST endpoint.
-    Protected by CSRF token and verifies 4-hour pending window.
-    """
-    user_id = session.get('user_id')
-    try:
-        order = cancel_order_by_customer(order_id=order_id, user_id=user_id)
-        flash(
-            f"Order #{order.order_number} has been cancelled successfully. "
-            f"100% store credit ({format_money(order.total_cents)}) has been refunded to your account.",
-            "success"
-        )
-        return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
-    except (ValueError, PermissionError) as e:
-        flash(str(e), "danger")
-        return redirect(url_for('front_bp.account_orders'))
-    except Exception as e:
-        flash(f"Unexpected error cancelling order: {e}", "danger")
-        return redirect(url_for('front_bp.account_orders'))
-=======
     user = current_user()
     if not user:
         return redirect(url_for('front_bp.login'))
@@ -335,24 +233,33 @@ def cancel_customer_order(order_id: int):
             db.session.commit()
             order = guest_order
 
+    if not order and str(order_number).isdigit():
+        order = db.session.get(Order, int(order_number))
+        if order and order.user_id != user.id and order.email.lower() != user.email.lower():
+            order = None
+
     if not order:
         abort(404)
 
-    # 4-hour grace period window calculation
-    grace_seconds = 4 * 3600
-    if order.created_at:
-        time_since_creation = (utc_now() - order.created_at).total_seconds()
-        can_cancel = (order.status == 'pending') and (time_since_creation <= grace_seconds)
-        time_remaining_seconds = max(0, int(grace_seconds - time_since_creation)) if can_cancel else 0
-    else:
-        can_cancel = False
-        time_remaining_seconds = 0
+    # Strict customer tenant scoping: only allow owner to cancel
+    if order.user_id != user.id and (not user.email or (order.email or '').lower() != user.email.lower()):
+        abort(404)
+
+    is_cancellable = is_order_cancellable_by_customer(order, max_hours=4)
+    remaining_minutes = 0
+    time_remaining_seconds = 0
+    if is_cancellable and order.created_at:
+        elapsed = (utc_now() - order.created_at).total_seconds()
+        remaining_minutes = max(0, int((4 * 3600 - elapsed) / 60))
+        time_remaining_seconds = max(0, int(4 * 3600 - elapsed))
 
     return render_template(
         'front/account/order_detail.html',
         user=user,
         order=order,
-        can_cancel=can_cancel,
+        can_cancel=is_cancellable,
+        is_cancellable=is_cancellable,
+        remaining_minutes=remaining_minutes,
         time_remaining_seconds=time_remaining_seconds,
         to_local=to_local,
         format_money=format_money,
@@ -360,76 +267,50 @@ def cancel_customer_order(order_id: int):
     )
 
 
-@front_bp.route('/account/orders/<order_number>/cancel', methods=['POST'], endpoint='account_order_cancel')
-@login_required
-def account_order_cancel(order_number: str):
-    """
-    Cancel a pending order within the 4-hour window, restoring inventory and notifying admin.
-    """
+def _process_order_cancellation(order_identifier):
+    """Internal helper to process order cancellation by order_id or order_number."""
     user = current_user()
     if not user:
         return redirect(url_for('front_bp.login'))
 
-    order = Order.query.filter_by(order_number=order_number, user_id=user.id).first()
-    if not order and user.email:
-        # Check if order was placed as guest with the customer's registered email
-        guest_order = Order.query.filter(
-            Order.order_number == order_number,
-            Order.user_id.is_(None),
-            db.func.lower(Order.email) == user.email.lower()
-        ).first()
-        if guest_order:
-            guest_order.user_id = user.id
-            db.session.commit()
-            order = guest_order
+    order = None
+    if str(order_identifier).isdigit():
+        order = db.session.get(Order, int(order_identifier))
+    if not order:
+        order = Order.query.filter_by(order_number=str(order_identifier)).first()
 
     if not order:
         abort(404)
 
-    if order.status != 'pending':
-        flash("Only pending orders can be cancelled.", "error")
-        return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
+    # Strict customer tenant scoping: only allow owner to cancel
+    if order.user_id != user.id and (not user.email or (order.email or '').lower() != user.email.lower()):
+        abort(404)
 
-    time_since_creation = (utc_now() - order.created_at).total_seconds()
-    if time_since_creation > (4 * 3600):
-        flash("The 4-hour cancellation window for this order has expired.", "error")
-        return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
-
-    # Mark as cancelled
-    order.status = 'cancelled'
-    order.cancelled_at = utc_now()
-
-    # Attempt to restore inventory stock
     try:
-        from services.stock_service import restore_stock
-        for item in order.items:
-            if item.variant_id:
-                try:
-                    restore_stock(item.variant_id, item.qty)
-                except (NotImplementedError, Exception):
-                    pass
-    except ImportError:
-        pass
+        cancelled_order = cancel_order_by_customer(order_id=order.id, user_id=user.id)
+        flash(
+            f"Order #{cancelled_order.order_number} has been cancelled successfully. "
+            f"100% store credit ({format_money(cancelled_order.total_cents)}) has been refunded to your account.",
+            "success"
+        )
+        return redirect(url_for('front_bp.account_order_detail', order_number=cancelled_order.order_number))
+    except (ValueError, PermissionError) as e:
+        flash(str(e), "danger")
+        return redirect(url_for('front_bp.account_orders'))
+    except Exception as e:
+        flash(f"Unexpected error cancelling order: {e}", "danger")
+        return redirect(url_for('front_bp.account_orders'))
 
-    # Attempt wallet refund if user balance exists
-    if hasattr(user, 'balance') and order.total_cents:
-        try:
-            user.balance = (user.balance or 0) + order.total_cents
-        except Exception:
-            pass
 
-    db.session.commit()
+@front_bp.route('/account/orders/<order_number>/cancel', methods=['POST'], endpoint='account_order_cancel')
+@login_required
+def account_order_cancel(order_number: str):
+    """Cancel a pending order within the 4-hour window by order_number."""
+    return _process_order_cancellation(order_number)
 
-    # Asynchronous Telegram alert (non-blocking)
-    alert_msg = (
-        f"🚫 <b>Order Cancelled by Customer</b>\n"
-        f"• Order: <code>#{order.order_number}</code>\n"
-        f"• Customer: {user.username} ({user.email})\n"
-        f"• Amount: {format_money(order.total_cents)}\n"
-        f"• Reason: Customer self-service cancellation within 4h grace period"
-    )
-    send_telegram(alert_msg)
 
-    flash(f"Order #{order.order_number} has been cancelled successfully.", "success")
-    return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
+@front_bp.post('/account/orders/<int:order_id>/cancel', endpoint='cancel_customer_order')
+@login_required
+def cancel_customer_order(order_id: int):
+    """Customer self-service cancellation POST endpoint by order_id."""
+    return _process_order_cancellation(order_id)
