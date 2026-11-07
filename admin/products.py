@@ -20,19 +20,13 @@ def admin_products():
     cat_id_int = int(category_id) if category_id and category_id.isdigit() else None
     brand_id = request.args.get('brand_id')
     brand_id_int = int(brand_id) if brand_id and brand_id.isdigit() else None
-    search = request.args.get('q')
+    search = request.args.get('q') or request.args.get('search')
 
-    if search:
-        products = stock_service.get_active_products(
-            category_id=cat_id_int,
-            brand_id=brand_id_int,
-            search=search
-        )
-    else:
-        products = stock_service.get_all_products(
-            category_id=cat_id_int,
-            brand_id=brand_id_int
-        )
+    products = stock_service.get_all_products(
+        category_id=cat_id_int,
+        brand_id=brand_id_int,
+        search=search
+    )
 
     categories = stock_service.get_all_categories()
     brands = stock_service.get_all_brands()

@@ -191,7 +191,8 @@ def get_active_products(
             (Product.name.ilike(term)) |
             (Product.description.ilike(term)) |
             (Product.brand.has(Brand.name.ilike(term))) |
-            (Product.category.has(Category.name.ilike(term)))
+            (Product.category.has(Category.name.ilike(term))) |
+            (Product.variants.any((ProductVariant.sku.ilike(term)) | (ProductVariant.spec_name.ilike(term))))
         )
 
     products = query.order_by(Product.id.asc()).all()
@@ -202,16 +203,49 @@ def get_active_products(
 
 def get_all_products(
     category_id: Optional[int] = None,
-    brand_id: Optional[int] = None
+    brand_id: Optional[int] = None,
+    search: Optional[str] = None,
+    category: Optional[Union[int, str]] = None,
+    brand: Optional[Union[int, str]] = None,
+    search_query: Optional[str] = None
 ) -> List[Product]:
     """
     Fetch all products (both active and inactive) for admin management.
+    Supports filtering by category, brand, and search keyword.
     """
     query = Product.query
-    if category_id is not None:
-        query = query.filter(Product.category_id == category_id)
-    if brand_id is not None:
-        query = query.filter(Product.brand_id == brand_id)
+
+    cat_target = category if category is not None else category_id
+    if cat_target is not None:
+        if isinstance(cat_target, int) or (isinstance(cat_target, str) and cat_target.isdigit()):
+            query = query.filter(Product.category_id == int(cat_target))
+        elif isinstance(cat_target, str) and cat_target.strip():
+            c_val = cat_target.strip()
+            query = query.filter(
+                Product.category.has((Category.slug == c_val.lower()) | (Category.name.ilike(c_val)))
+            )
+
+    brand_target = brand if brand is not None else brand_id
+    if brand_target is not None:
+        if isinstance(brand_target, int) or (isinstance(brand_target, str) and brand_target.isdigit()):
+            query = query.filter(Product.brand_id == int(brand_target))
+        elif isinstance(brand_target, str) and brand_target.strip():
+            b_val = brand_target.strip()
+            query = query.filter(
+                Product.brand.has((Brand.slug == b_val.lower()) | (Brand.name.ilike(b_val)))
+            )
+
+    term_val = search if search is not None else search_query
+    if term_val and str(term_val).strip():
+        term = f"%{str(term_val).strip()}%"
+        query = query.filter(
+            (Product.name.ilike(term)) |
+            (Product.description.ilike(term)) |
+            (Product.brand.has(Brand.name.ilike(term))) |
+            (Product.category.has(Category.name.ilike(term))) |
+            (Product.variants.any((ProductVariant.sku.ilike(term)) | (ProductVariant.spec_name.ilike(term))))
+        )
+
     products = query.order_by(Product.id.asc()).all()
     for p in products:
         attach_view_attributes(p)

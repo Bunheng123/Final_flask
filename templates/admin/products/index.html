@@ -2,6 +2,17 @@
 {% block tab_title %}Products & Inventory{% endblock %}
 
 {% block content %}
+<style>
+  .search-highlight {
+    background-color: rgba(245, 158, 11, 0.25);
+    color: #f59e0b;
+    padding: 0.05em 0.25em;
+    border-radius: 0.25rem;
+    font-weight: 700;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+  }
+</style>
+
 <!-- Header Bar -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
   <div>
@@ -102,16 +113,34 @@
 
 <!-- Filter Bar -->
 <div class="bg-card border border-border rounded-2xl p-4 mb-6 shadow-card flex flex-col md:flex-row gap-4 items-center justify-between">
-  <form action="{{ url_for('admin_bp.admin_products') }}" method="GET" class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-    <input
-      type="text"
-      name="q"
-      value="{{ search_query }}"
-      placeholder="Search product name..."
-      class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet w-56"
-    />
+  <form id="adminSearchForm" action="{{ url_for('admin_bp.admin_products') }}" method="GET" class="flex flex-wrap items-center gap-3 w-full" onsubmit="event.preventDefault(); applyAdminLiveFilters();">
+    <!-- Instant Search Input -->
+    <div class="relative flex-1 min-w-[240px]">
+      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
+        <i class="bi bi-search text-xs"></i>
+      </div>
+      <input
+        type="search"
+        id="adminLiveSearchInput"
+        name="q"
+        value="{{ search_query }}"
+        placeholder="Instant search by product, SKU, spec, brand, or category..."
+        autocomplete="off"
+        class="w-full pl-8 pr-8 py-2 border border-border bg-paper rounded-lg text-xs text-text focus:outline-none focus:border-violet"
+      />
+      <button
+        type="button"
+        id="adminClearSearchBtn"
+        class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-text-muted hover:text-text transition {% if not search_query %}hidden{% endif %}"
+        title="Clear search"
+      >
+        <i class="bi bi-x-circle-fill text-xs"></i>
+      </button>
+    </div>
 
+    <!-- Category Dropdown -->
     <select
+      id="adminCategorySelect"
       name="category_id"
       class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
     >
@@ -123,7 +152,9 @@
       {% endfor %}
     </select>
 
+    <!-- Brand Dropdown -->
     <select
+      id="adminBrandSelect"
       name="brand_id"
       class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
     >
@@ -135,22 +166,32 @@
       {% endfor %}
     </select>
 
-    <button
-      type="submit"
-      class="bg-paper hover:bg-border text-text border border-border px-4 py-2 rounded-lg text-xs font-semibold transition"
+    <!-- Status Dropdown -->
+    <select
+      id="adminStatusSelect"
+      name="status"
+      class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
     >
-      Filter
-    </button>
+      <option value="">All Statuses</option>
+      <option value="active">Active Only</option>
+      <option value="inactive">Inactive Only</option>
+    </select>
 
-    {% if search_query or selected_category or selected_brand %}
-      <a
-        href="{{ url_for('admin_bp.admin_products') }}"
-        class="text-xs text-text-muted hover:text-text underline ml-2"
-      >
-        Clear Filter
-      </a>
-    {% endif %}
+    <button
+      type="button"
+      id="adminResetFiltersBtn"
+      class="text-xs text-violet hover:underline font-semibold ml-auto transition {% if not search_query and not selected_category and not selected_brand %}hidden{% endif %}"
+    >
+      Clear Filters
+    </button>
   </form>
+</div>
+
+<!-- Results Counter -->
+<div class="flex items-center justify-between text-xs text-text-muted mb-3 px-1">
+  <span>
+    Showing <span class="font-bold text-text" id="adminVisibleCount">{{ products|length }}</span> of {{ stats.total_products }} product(s)
+  </span>
 </div>
 
 <!-- Products Table -->
@@ -168,22 +209,33 @@
           <th class="py-3 px-4 text-right">Actions</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-border">
+      <tbody class="divide-y divide-border" id="adminProductsTableBody">
         {% if products %}
           {% for product in products %}
-            <tr class="hover:bg-paper/50 transition">
+            <tr
+              class="admin-product-row hover:bg-paper/50 transition"
+              data-id="{{ product.id }}"
+              data-name="{{ product.name }}"
+              data-description="{{ product.description or '' }}"
+              data-category-id="{{ product.category_id }}"
+              data-category-name="{{ product.category.name if product.category and product.category.name is defined else (product.category or '') }}"
+              data-brand-id="{{ product.brand_id or '' }}"
+              data-brand-name="{{ product.brand.name if product.brand else '' }}"
+              data-skus="{% for v in product.variants %}{{ v.sku }} {{ v.spec_name }} {% endfor %}"
+              data-status="{{ 'active' if product.is_active else 'inactive' }}"
+            >
               <!-- Image & Name -->
               <td class="py-3 px-4">
                 <div class="flex items-center gap-3">
                   <div class="w-12 h-12 rounded-xl bg-paper border border-border overflow-hidden shrink-0 flex items-center justify-center">
                     {% if product.image %}
-                      <img src="{{ product.image }}" alt="{{ product.name }}" class="w-full h-full object-cover"/>
+                      <img src="{{ product.image }}" alt="{{ product.name }}" class="w-full h-full object-cover" onerror="this.src='/static/images/no-image.jpg'"/>
                     {% else %}
                       <i class="bi bi-image text-text-muted text-lg"></i>
                     {% endif %}
                   </div>
                   <div>
-                    <span class="font-semibold text-text block text-sm">{{ product.name }}</span>
+                    <span class="product-title font-semibold text-text block text-sm">{{ product.name | highlight_query(search_query) }}</span>
                     <span class="text-[11px] text-text-muted">ID: #{{ product.id }}</span>
                   </div>
                 </div>
@@ -192,11 +244,11 @@
               <!-- Category & Brand -->
               <td class="py-3 px-4">
                 <div class="flex flex-col gap-1 items-start">
-                  <span class="bg-paper border border-border px-2.5 py-0.5 rounded-full text-[11px] font-medium text-text-muted">
+                  <span class="product-category bg-paper border border-border px-2.5 py-0.5 rounded-full text-[11px] font-medium text-text-muted">
                     {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
                   </span>
                   {% if product.brand %}
-                    <span class="bg-violet/10 text-violet border border-violet/20 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                    <span class="product-brand bg-violet/10 text-violet border border-violet/20 px-2 py-0.5 rounded-full text-[10px] font-semibold">
                       <i class="bi bi-patch-check-fill text-[9px]"></i> {{ product.brand.name }}
                     </span>
                   {% endif %}
@@ -209,7 +261,7 @@
                   <span class="font-bold text-text">
                     {{ product.variants|length }} Variant{{ 's' if product.variants|length != 1 else '' }}
                   </span>
-                  <div class="flex flex-wrap gap-1">
+                  <div class="product-skus-container flex flex-wrap gap-1">
                     {% for v in product.variants[:3] %}
                       <span class="bg-paper border border-border px-1.5 py-0.5 rounded text-[10px] font-mono text-text-muted">
                         {{ v.sku }}
@@ -308,15 +360,173 @@
             </tr>
           {% endfor %}
         {% else %}
-          <tr>
+          <tr id="adminNoProductsServerRow">
             <td colspan="7" class="py-8 text-center text-text-muted text-xs">
               No products found in catalog. Click "Add Product" to create your first item.
             </td>
           </tr>
         {% endif %}
+
+        <!-- Client-Side No Results Row -->
+        <tr id="adminNoResultsRow" class="hidden">
+          <td colspan="7" class="py-12 text-center text-text-muted text-xs">
+            <i class="bi bi-search text-2xl mb-2 block opacity-40"></i>
+            No products match your search or filter criteria.
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- Admin Real-Time Instant Filtering Script -->
+<script>
+  (function() {
+    const searchInput = document.getElementById('adminLiveSearchInput');
+    const clearBtn = document.getElementById('adminClearSearchBtn');
+    const catSelect = document.getElementById('adminCategorySelect');
+    const brandSelect = document.getElementById('adminBrandSelect');
+    const statusSelect = document.getElementById('adminStatusSelect');
+    const resetBtn = document.getElementById('adminResetFiltersBtn');
+    const visibleCountSpan = document.getElementById('adminVisibleCount');
+    const noResultsRow = document.getElementById('adminNoResultsRow');
+    const rows = document.querySelectorAll('.admin-product-row');
+    let debounceTimer = null;
+
+    // XSS-Safe HTML entity sanitizer
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // XSS-Safe regex keyword highlighter
+    function highlightText(rawText, query) {
+      const escaped = escapeHtml(rawText);
+      if (!query || !query.trim()) return escaped;
+      const cleanQuery = query.trim();
+      const escapedQuery = escapeHtml(cleanQuery);
+      if (!escapedQuery) return escaped;
+
+      const regexSafe = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp('(' + regexSafe + ')', 'gi');
+      return escaped.replace(regex, '<mark class="search-highlight">$1</mark>');
+    }
+
+    window.applyAdminLiveFilters = function() {
+      const query = (searchInput.value || '').trim().toLowerCase();
+      const selectedCat = (catSelect.value || '').trim();
+      const selectedBrand = (brandSelect.value || '').trim();
+      const selectedStatus = (statusSelect.value || '').trim().toLowerCase();
+      let visibleCount = 0;
+
+      if (query) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+
+      rows.forEach(row => {
+        const name = (row.dataset.name || '');
+        const desc = (row.dataset.description || '');
+        const catId = (row.dataset.categoryId || '');
+        const brandId = (row.dataset.brandId || '');
+        const skus = (row.dataset.skus || '');
+        const status = (row.dataset.status || '').toLowerCase();
+
+        // 1. Category match
+        const matchesCat = !selectedCat || catId === selectedCat;
+
+        // 2. Brand match
+        const matchesBrand = !selectedBrand || brandId === selectedBrand;
+
+        // 3. Status match
+        const matchesStatus = !selectedStatus || status === selectedStatus;
+
+        // 4. Query match (name, description, SKUs, category, brand)
+        let matchesQuery = true;
+        if (query) {
+          const searchable = (name + ' ' + desc + ' ' + skus + ' ' + row.dataset.categoryName + ' ' + row.dataset.brandName).toLowerCase();
+          matchesQuery = searchable.includes(query);
+        }
+
+        if (matchesCat && matchesBrand && matchesStatus && matchesQuery) {
+          row.style.display = '';
+          visibleCount++;
+
+          // Live XSS-safe highlight on product title
+          const titleEl = row.querySelector('.product-title');
+          if (titleEl) {
+            titleEl.innerHTML = highlightText(name, query);
+          }
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      // Update counter
+      if (visibleCountSpan) {
+        visibleCountSpan.textContent = visibleCount;
+      }
+
+      // Empty state toggle
+      if (noResultsRow) {
+        if (visibleCount === 0 && rows.length > 0) {
+          noResultsRow.classList.remove('hidden');
+        } else {
+          noResultsRow.classList.add('hidden');
+        }
+      }
+
+      // Reset button visibility
+      if (resetBtn) {
+        if (query || selectedCat || selectedBrand || selectedStatus) {
+          resetBtn.classList.remove('hidden');
+        } else {
+          resetBtn.classList.add('hidden');
+        }
+      }
+
+      // Synchronize URL in browser history
+      const params = new URLSearchParams();
+      if (query) params.set('q', query);
+      if (selectedCat) params.set('category_id', selectedCat);
+      if (selectedBrand) params.set('brand_id', selectedBrand);
+      if (selectedStatus) params.set('status', selectedStatus);
+      const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, '', newUrl);
+    };
+
+    // Instant debounced typing listener (50ms)
+    searchInput.addEventListener('input', function() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(applyAdminLiveFilters, 50);
+    });
+
+    clearBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      searchInput.focus();
+      applyAdminLiveFilters();
+    });
+
+    // Dropdown change listeners
+    catSelect.addEventListener('change', applyAdminLiveFilters);
+    brandSelect.addEventListener('change', applyAdminLiveFilters);
+    statusSelect.addEventListener('change', applyAdminLiveFilters);
+
+    // Reset all filters button
+    resetBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      catSelect.value = '';
+      brandSelect.value = '';
+      statusSelect.value = '';
+      applyAdminLiveFilters();
+    });
+  })();
+</script>
 {% endblock %}
 

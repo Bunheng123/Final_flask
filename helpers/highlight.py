@@ -35,3 +35,4 @@ def highlight_query(value: any, query: str = None) -> Markup:
     highlighted = pattern.sub(r'<mark class="search-highlight">\1</mark>', escaped_value)
 
     return Markup(highlighted)
+

@@ -1255,6 +1255,39 @@ def test_api_products_with_category_brand_and_search(client, sample_catalog):
     assert any("iPhone 15 Pro" in p["name"] for p in data_search["data"])
 
 
+def test_admin_products_live_search_and_filtering(client, sample_catalog):
+    """
+    Test Admin /admin/products search by name, SKU, brand, and XSS safety.
+    """
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+
+    # 1. Search by product name
+    res_name = client.get('/admin/products?q=ThinkPad')
+    assert res_name.status_code == 200
+    html_name = res_name.data.decode('utf-8')
+    assert "ThinkPad" in html_name
+    assert '<mark class="search-highlight">ThinkPad</mark>' in html_name
+
+    # 2. Search by variant SKU
+    res_sku = client.get('/admin/products?q=TP-X1-DEF')
+    assert res_sku.status_code == 200
+    html_sku = res_sku.data.decode('utf-8')
+    assert "ThinkPad" in html_sku
+    assert "TP-X1-DEF" in html_sku
+
+    # 3. Search with XSS input
+    res_xss = client.get('/admin/products?q=<script>alert(1)</script>')
+    assert res_xss.status_code == 200
+    html_xss = res_xss.data.decode('utf-8')
+    # Must not contain raw unescaped script tag
+    assert "<script>alert(1)</script>" not in html_xss
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html_xss or 'value="&lt;script&gt;alert(1)&lt;/script&gt;"' in html_xss or '&#039;' in html_xss or '&quot;' in html_xss
+
+
+
 
 
 
