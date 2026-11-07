@@ -11,6 +11,7 @@ from helpers.upload import (
     UPLOAD_DIR,
     ALLOWED_EXT,
 )
+from bakong_khqr import KHQR
 
 # If run directly as __main__, register 'app' in sys.modules for backwards compatibility
 if __name__ == '__main__':

@@ -1,3 +1,17 @@
 {# Owner: Workstream B / M5 (User Accounts, Wishlist & Reviews) #}
-<!-- Wishlist Button Partial (Stub) -->
-
+{% set pid = product.id if product is defined and product.id is defined else (product_id if product_id is defined else '') %}
+{% if pid %}
+<form action="{{ url_for('front_bp.wishlist_add') }}" method="POST" class="w-full inline-block">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="product_id" value="{{ pid }}">
+  <button
+    type="submit"
+    class="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-700/80 text-slate-200 border border-white/10 font-semibold transition hover:text-pink-400 group"
+  >
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:scale-110 transition text-pink-500">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+    </svg>
+    <span>Save to Wishlist</span>
+  </button>
+</form>
+{% endif %}

@@ -3,7 +3,7 @@ products = [
       "id": 1,
       "name": "MSI Katana 15",
       "description": "Gaming laptop with Intel Core i7, RTX 4060, 16GB RAM, and 144Hz display.",
-      "price": 1299.99,
+      "price": 0.1,
       "category": "Laptop",
       "brand": "MSI",
       "stock": 12,

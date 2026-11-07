@@ -17,3 +17,5 @@ Flask-APScheduler==1.13.1
 Flask-Mail==0.10.0
 pytest==9.2.0
 tzdata==2026.6
+bakong-khqr==0.6.5
+qrcode==8.2
