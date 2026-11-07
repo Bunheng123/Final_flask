@@ -324,7 +324,10 @@ def account_order_cancel(order_number: str = None, order_id: int = None):
     try:
         cancel_order_by_customer(order.id, user_id=user.id)
         db.session.commit()
-        flash(f"Order #{order.order_number} has been cancelled successfully. Any eligible refund has been returned to your wallet.", "success")
+        if hasattr(order, 'payment_status') and order.payment_status == 'refunded':
+            flash(f"Order #{order.order_number} has been cancelled successfully. Eligible refund has been returned to your wallet.", "success")
+        else:
+            flash(f"Order #{order.order_number} has been cancelled successfully.", "success")
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), "error")

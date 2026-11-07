@@ -263,16 +263,43 @@ def get_payment_status(reference_md5):
             if client is None:
                 raise RuntimeError('The bakong-khqr package is required to check payment status.')
             payment['_last_checked_at'] = now_ts
-            bakong_status = client.check_payment(reference_md5)
+
+            raw_resp = None
+            try:
+                raw_resp = client._KHQR__post_request("/check_transaction_by_md5", {"md5": reference_md5})
+            except Exception:
+                raw_resp = None
+
+            if isinstance(raw_resp, dict):
+                resp_code = raw_resp.get("responseCode")
+                err_code = raw_resp.get("errorCode")
+                resp_msg = raw_resp.get("responseMessage", "")
+
+                if err_code == 17 or "limit of 100 exceeded" in str(resp_msg).lower():
+                    payment['bakong_status'] = 'QUOTA_EXCEEDED'
+                    payment['gateway_error'] = 'Daily limit of 100 requests exceeded on NBC Bakong Developer token.'
+                    return {
+                        'success': False,
+                        'status': 'quota_exceeded',
+                        'message': 'Daily request limit of 100 exceeded on Bakong Developer API. If you have already paid in your app, your funds are safe! Please contact admin to confirm your order.',
+                        'data': payment
+                    }
+                elif resp_code == 0:
+                    payment['bakong_status'] = 'PAID'
+                    payment['status'] = 'paid'
+                    payment['paid_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                else:
+                    payment['bakong_status'] = 'UNPAID'
+            else:
+                bakong_status = client.check_payment(reference_md5)
+                payment['bakong_status'] = str(bakong_status).upper()
+                if payment['bakong_status'] == 'PAID':
+                    payment['status'] = 'paid'
+                    payment['paid_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                elif payment['bakong_status'] == 'EXPIRED':
+                    payment['status'] = 'expired'
         except Exception as exc:
             raise RuntimeError('Bakong payment status check failed.') from exc
-
-        payment['bakong_status'] = str(bakong_status).upper()
-        if payment['bakong_status'] == 'PAID':
-            payment['status'] = 'paid'
-            payment['paid_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        elif payment['bakong_status'] == 'EXPIRED':
-            payment['status'] = 'expired'
 
     return {'success': True, 'data': payment}
 

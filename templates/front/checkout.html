@@ -469,6 +469,11 @@
           const result = await response.json();
           if (returningToCheckout) return;
 
+          if (response.status === 429 || result.status === 'quota_exceeded') {
+            if (statusMessage) statusMessage.textContent = '⚠️ Bakong API daily quota of 100 requests reached. If you already paid in your app, your funds are safe! Please do not cancel — contact admin to confirm your order.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';
+            return;
+          }
           if (response.status === 503) {
             if (statusMessage) statusMessage.textContent = 'Payment gateway busy. Please wait a moment and try again.';
             if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';

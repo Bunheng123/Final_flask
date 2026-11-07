@@ -23,6 +23,8 @@ def api_payment_check(payment_hash):
         }), 503
 
     if not status['success']:
+        if status.get('status') == 'quota_exceeded':
+            return jsonify(status), 429
         return jsonify({
             'success': False,
             'status': 'not_found',

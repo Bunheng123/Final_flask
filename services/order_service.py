@@ -93,6 +93,9 @@ def transition_order(order_id: int, target_status: str, admin_id: int = None, re
 
     if target == 'confirmed':
         order.confirmed_at = now
+        if hasattr(order, 'payment_status') and order.payment_status == 'pending':
+            order.payment_status = 'paid'
+            order.paid_at = now
         notification_title = f"Order #{order.order_number} Confirmed"
         notification_message = f"Your order #{order.order_number} has been approved and confirmed for processing."
     elif target == 'shipped':
