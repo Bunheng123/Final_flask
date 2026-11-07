@@ -691,4 +691,106 @@ def test_admin_delete_product(client, sample_catalog):
         assert stock_service.get_product_by_id(prod_id) is None
 
 
+# ==========================================
+# 8. Product Edit CRUD & Test Pricing Tests
+# ==========================================
+
+def test_storefront_stepper_quantity_controls(client, sample_catalog):
+    """Storefront product detail page renders - and + stepper controls."""
+    prod_id = sample_catalog["prod1_id"]
+    res = client.get(f'/product/{prod_id}')
+    assert res.status_code == 200
+    html = res.data.decode('utf-8')
+    assert 'id="qtyMinusBtn"' in html
+    assert 'id="qtyPlusBtn"' in html
+    assert 'id="productQtyInput"' in html
+    assert 'stepQty(-1)' in html
+    assert 'stepQty(1)' in html
+
+
+def test_admin_edit_product_crud(client, sample_catalog):
+    """
+    GET and POST /admin/products/<id>/edit provides full CRUD editing
+    over product identity, category, description, and status.
+    """
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+
+    prod_id = sample_catalog["prod1_id"]
+
+    # 1. GET edit form
+    res_get = client.get(f'/admin/products/{prod_id}/edit')
+    assert res_get.status_code == 200
+    html_get = res_get.data.decode('utf-8')
+    assert f'value="ThinkPad X1 Carbon"' in html_get
+    assert 'name="csrf_token"' in html_get
+    assert 'name="name"' in html_get
+    assert 'name="category_id"' in html_get
+
+    # 2. POST update product
+    new_cat_id = sample_catalog["cat_phones_id"]
+    res_post = client.post(f'/admin/products/{prod_id}/edit', data={
+        'name': 'ThinkPad X1 Carbon Gen 12',
+        'category_id': str(new_cat_id),
+        'description': 'Updated flagship ultrabook specifications',
+        'image': 'https://example.com/x1gen12.png',
+        'is_active': '1'
+    }, follow_redirects=True)
+
+    assert res_post.status_code == 200
+    html_post = res_post.data.decode('utf-8')
+    assert "ThinkPad X1 Carbon Gen 12" in html_post
+
+    # Verify DB
+    with client.application.app_context():
+        updated = stock_service.get_product_by_id(prod_id)
+        assert updated.name == 'ThinkPad X1 Carbon Gen 12'
+        assert updated.category_id == new_cat_id
+        assert updated.description == 'Updated flagship ultrabook specifications'
+        assert updated.image == 'https://example.com/x1gen12.png'
+
+
+def test_set_test_prices_cents_service_and_admin_route(client, sample_catalog):
+    """
+    Tests set_test_prices_cents() domain service and POST /admin/products/set-test-prices
+    setting all variants to 1¢ / 2¢ ($0.01 / $0.02) test prices.
+    """
+    with client.application.app_context():
+        # Service function alternating 1 and 2 cents
+        count = stock_service.set_test_prices_cents()
+        assert count > 0
+
+        variants = ProductVariant.query.order_by(ProductVariant.id.asc()).all()
+        assert variants[0].price_cents in (1, 2)
+        assert variants[1].price_cents in (1, 2)
+
+        # Service function explicit 1 cent for all
+        stock_service.set_test_prices_cents(cents=1)
+        variants = ProductVariant.query.all()
+        for v in variants:
+            assert v.price_cents == 1
+
+    # Admin route trigger
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+
+    res_route = client.post('/admin/products/set-test-prices', follow_redirects=True)
+    assert res_route.status_code == 200
+    html = res_route.data.decode('utf-8')
+    assert "Successfully updated" in html
+    assert "test prices" in html
+
+    # Verify DB after route call
+    with client.application.app_context():
+        variants = ProductVariant.query.order_by(ProductVariant.id.asc()).all()
+        for idx, v in enumerate(variants):
+            expected = 1 if (idx % 2 == 0) else 2
+            assert v.price_cents == expected
+
+
+
 

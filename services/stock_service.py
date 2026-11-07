@@ -448,6 +448,22 @@ def get_low_stock_variants(threshold: Optional[int] = None) -> List[ProductVaria
     return low_stock
 
 
+def set_test_prices_cents(cents: Optional[int] = None) -> int:
+    """
+    Update all product variants in the database to test pricing: 1 cent ($0.01) or 2 cents ($0.02).
+    If cents is None, alternates between 1 cent ($0.01) and 2 cents ($0.02) across all variants.
+    Returns the total number of variants updated.
+    """
+    variants = ProductVariant.query.order_by(ProductVariant.id.asc()).all()
+    for idx, v in enumerate(variants):
+        if cents is not None:
+            v.price_cents = max(1, int(cents))
+        else:
+            v.price_cents = 1 if (idx % 2 == 0) else 2
+    db.session.commit()
+    return len(variants)
+
+
 # ==========================================
 # 3. Concurrency & Inventory Decrement Contract
 # ==========================================
