@@ -2,13 +2,15 @@ import datetime
 import json
 import os
 import requests
-from flask import render_template, request, make_response, current_app
+from flask import render_template, request, make_response, current_app, session
 from front import front_bp
 from front.cart import _read_cart_cookie
 from product import get_product_by_id
+from helpers.auth import login_required, current_user
 
 # render checkout page, get cart cookie and render to checkout page, calculate subtotal, shipping and total, free shipping for all order
 @front_bp.get('/checkout', endpoint='checkout')
+@login_required
 def checkout():
     cart_list = _read_cart_cookie()
     for item in cart_list:
@@ -25,16 +27,19 @@ def checkout():
     subtotal = sum(item['price'] * item['qty'] for item in cart_list)
     shipping = 0  # free shipping
     total = subtotal + shipping
+    user = current_user()
     return render_template(
         'front/checkout.html',
         cart_items=cart_list,
         subtotal=subtotal,
         shipping=shipping,
         total=total,
+        user=user,
     )
 
 # handle checkout form post, read posted user info, capture cart snapshot before clearing cookie, build the Telegram order message, send order message to Telegram bot, clear the cart cookie and render checkout page with order placed message
 @front_bp.post('/checkout', endpoint='do_checkout')
+@login_required
 def do_checkout():
     # Read posted user info
     order_info = {
