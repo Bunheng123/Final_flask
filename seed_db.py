@@ -42,8 +42,13 @@ def seed_database(test_price_cents: Optional[int] = None):
     print(" Initializing Database & Seeding Catalog with Random Test Prices ($0.01 - $0.03)")
     print("=" * 60)
 
-    # 1. Create all database tables if they do not exist
+    # 1. Create all database tables and apply pending migrations
     db.create_all()
+    try:
+        from flask_migrate import upgrade as migrate_upgrade
+        migrate_upgrade()
+    except Exception as e:
+        print(f"  Note on migrations: {e}")
 
     # 2. Seed Default Users
     print("\n[1/5] Checking / Seeding Default Users...")
