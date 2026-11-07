@@ -171,8 +171,16 @@ def attach_view_attributes(product: Optional[Product]) -> Optional[Product]:
         v.price_formatted = format_money(v.price_cents)
         v.in_stock = (v.stock > 0)
 
+    product.active_variants = active_vars
+
     if active_vars:
-        default_var = next((v for v in active_vars if v.spec_name.lower() == 'default'), active_vars[0])
+        # Prioritize active in-stock variant for default selection
+        in_stock_active = [v for v in active_vars if v.stock > 0]
+        if in_stock_active:
+            default_var = next((v for v in in_stock_active if v.spec_name.lower() == 'default'), in_stock_active[0])
+        else:
+            default_var = next((v for v in active_vars if v.spec_name.lower() == 'default'), active_vars[0])
+
         product.default_variant = default_var
         product.price = from_cents(default_var.price_cents)
         product.price_formatted = format_money(default_var.price_cents)
@@ -203,13 +211,22 @@ def get_active_products(
     search_query: Optional[str] = None
 ) -> List[Product]:
     """
-    Fetch active products and their linked product variants.
+    Fetch active products and their linked product variants for the customer storefront.
+    Only products with at least one active variant (is_active == True) having stock > 0
+    are returned.
     Supports filtering by:
       - category (id, slug, or name)
       - brand (id, slug, or name)
       - search keyword (matching product name, description, brand, or category)
     """
     query = Product.query.filter(Product.is_active == True)
+
+    # Filter out products that have no active variants or where all active variants have stock <= 0
+    query = query.filter(
+        Product.variants.any(
+            (ProductVariant.is_active == True) & (ProductVariant.stock > 0)
+        )
+    )
 
     # 1. Category filter
     cat_target = category if category is not None else category_id
@@ -246,9 +263,13 @@ def get_active_products(
         )
 
     products = query.order_by(Product.id.asc()).all()
+    visible_products = []
     for p in products:
         attach_view_attributes(p)
-    return products
+        # Extra guard: must have at least one active variant with stock > 0
+        if any(v.is_active and v.stock > 0 for v in p.variants):
+            visible_products.append(p)
+    return visible_products
 
 
 def get_all_products(
@@ -302,9 +323,16 @@ def get_all_products(
     return products
 
 
-def get_product_by_id(product_id: int, only_active: bool = False) -> Optional[Product]:
+def get_product_by_id(
+    product_id: int,
+    only_active: bool = False,
+    require_in_stock: bool = False
+) -> Optional[Product]:
     """
     Fetch a single product by primary key ID.
+    Used by admin routes and storefront helpers.
+    If only_active=True: requires product.is_active is True.
+    If require_in_stock=True: requires product to have at least one active variant with stock > 0.
     """
     query = Product.query.filter(Product.id == product_id)
     if only_active:
@@ -312,7 +340,22 @@ def get_product_by_id(product_id: int, only_active: bool = False) -> Optional[Pr
     product = query.first()
     if product:
         attach_view_attributes(product)
+        if require_in_stock:
+            active_vars = [v for v in product.variants if v.is_active]
+            if not active_vars or sum(v.stock for v in active_vars) <= 0 or not any(v.stock > 0 for v in active_vars):
+                return None
     return product
+
+
+def get_storefront_product_by_id(product_id: int) -> Optional[Product]:
+    """
+    Storefront helper: fetches product only if it is active and has at least one active in-stock variant.
+    Returns None if:
+      - Product does not exist or product.is_active is False
+      - Product has no active variants (is_active == True)
+      - All active variants have stock <= 0 (sum of active stock <= 0)
+    """
+    return get_product_by_id(product_id, only_active=True, require_in_stock=True)
 
 
 def create_product(

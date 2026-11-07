@@ -529,6 +529,135 @@ def test_api_product_detail_with_db_catalog(client, sample_catalog):
     assert len(json_data['data']['variants']) == 2
 
 
+def test_zero_stock_product_hidden_from_storefront_and_api(client, sample_catalog):
+    """
+    A product where all active variants have stock <= 0 must be hidden from customers:
+    - Excluded from stock_service.get_active_products()
+    - Excluded from storefront GET /products, GET /, and GET /api/products
+    - GET /product/<id> and GET /api/products/<id> return 404
+    - Admin GET /admin/products and stock_service.get_all_products() still show it for restocking
+    """
+    with client.application.app_context():
+        prod_id = sample_catalog["prod1_id"]
+        prod1 = stock_service.get_product_by_id(prod_id)
+        for v in prod1.variants:
+            stock_service.update_stock(v.id, 0)
+
+        # 1. Service layer check
+        active_prods = stock_service.get_active_products()
+        assert prod_id not in [p.id for p in active_prods]
+
+        # Admin service helper still includes it
+        all_prods = stock_service.get_all_products()
+        assert prod_id in [p.id for p in all_prods]
+        assert stock_service.get_product_by_id(prod_id) is not None
+
+    # 2. Storefront listing (/products)
+    res_list = client.get('/products')
+    assert res_list.status_code == 200
+    html_list = res_list.data.decode('utf-8')
+    assert f'data-product-id="{prod_id}"' not in html_list
+
+    # 3. Storefront homepage (/)
+    res_home = client.get('/')
+    assert res_home.status_code == 200
+    html_home = res_home.data.decode('utf-8')
+    assert f'/product/{prod_id}' not in html_home
+
+    # 4. Storefront API (/api/products)
+    res_api = client.get('/api/products')
+    assert res_api.status_code == 200
+    api_data = res_api.get_json()['data']
+    assert prod_id not in [p['id'] for p in api_data]
+
+    # 5. Detail page returns 404
+    res_detail = client.get(f'/product/{prod_id}')
+    assert res_detail.status_code == 404
+
+    # 6. Detail API returns 404
+    res_api_detail = client.get(f'/api/products/{prod_id}')
+    assert res_api_detail.status_code == 404
+
+    # 7. Admin dashboard still lists it for restock
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+        sess['user_role'] = 'admin'
+
+    res_admin = client.get('/admin/products')
+    assert res_admin.status_code == 200
+    admin_html = res_admin.data.decode('utf-8')
+    assert "ThinkPad X1 Carbon" in admin_html
+
+
+def test_inactive_variants_product_hidden_from_storefront(client, sample_catalog):
+    """
+    A product where all variants have is_active = False must be hidden from storefront
+    and return 404 on detail views, but remain accessible in admin.
+    """
+    with client.application.app_context():
+        prod_id = sample_catalog["prod2_id"]
+        prod2 = stock_service.get_product_by_id(prod_id)
+        for v in prod2.variants:
+            stock_service.update_variant(v.id, is_active=False)
+
+        active_prods = stock_service.get_active_products()
+        assert prod_id not in [p.id for p in active_prods]
+
+    res_list = client.get('/products')
+    assert res_list.status_code == 200
+    assert f'data-product-id="{prod_id}"' not in res_list.data.decode('utf-8')
+
+    res_detail = client.get(f'/product/{prod_id}')
+    assert res_detail.status_code == 404
+
+    res_api_detail = client.get(f'/api/products/{prod_id}')
+    assert res_api_detail.status_code == 404
+
+    # Admin dashboard still shows it
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+        sess['user_role'] = 'admin'
+
+    res_admin = client.get('/admin/products')
+    assert res_admin.status_code == 200
+    assert "iPhone 15 Pro" in res_admin.data.decode('utf-8')
+
+
+def test_product_detail_exposes_only_active_variants(client, sample_catalog):
+    """
+    On the product detail page and API, only active variants (is_active == True)
+    are shown to shoppers in the variant selector, and the in-stock variant is selected by default.
+    """
+    with client.application.app_context():
+        prod1 = stock_service.get_product_by_id(sample_catalog["prod1_id"])
+        # Deactivate default variant, leave pro variant active
+        def_var = next(v for v in prod1.variants if v.sku == "TP-X1-DEF")
+        pro_var = next(v for v in prod1.variants if v.sku == "TP-X1-PRO")
+        pro_var_id = pro_var.id
+        stock_service.update_variant(def_var.id, is_active=False)
+
+    # 1. Product detail page
+    res = client.get(f'/product/{sample_catalog["prod1_id"]}')
+    assert res.status_code == 200
+    html = res.data.decode('utf-8')
+    assert "TP-X1-DEF" not in html
+    assert "TP-X1-PRO" in html
+    # Pro variant must be present and selected
+    assert f'value="{pro_var_id}"' in html
+
+    # 2. Product API detail
+    res_api = client.get(f'/api/products/{sample_catalog["prod1_id"]}')
+    assert res_api.status_code == 200
+    data = res_api.get_json()['data']
+    variant_skus = [v['sku'] for v in data['variants']]
+    assert "TP-X1-DEF" not in variant_skus
+    assert "TP-X1-PRO" in variant_skus
+
+
 # ==========================================
 # 7. Admin Controllers & Variant Management Tests
 # ==========================================
