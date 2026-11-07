@@ -1,6 +1,7 @@
 from models.user import User
 from models.block_log import BlockLog
 from models.category import Category
+from models.brand import Brand
 from models.product import Product
 from models.product_variant import ProductVariant
 from models.order import Order
@@ -14,6 +15,7 @@ __all__ = [
     'User',
     'BlockLog',
     'Category',
+    'Brand',
     'Product',
     'ProductVariant',
     'Order',

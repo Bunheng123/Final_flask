@@ -2,6 +2,7 @@
 Stock Service - Inventory management and atomic stock adjustments.
 Owner: Workstream A / Member 2 (Catalog, Product Variants & Low-Stock Alerts)
 """
+import re
 import sys
 from typing import Optional, List, Union
 from sqlalchemy import text
@@ -10,10 +11,15 @@ from flask import current_app
 from extensions import db
 from models.product import Product
 from models.product_variant import ProductVariant
+from models.brand import Brand
+from models.category import Category
 from helpers.money import to_cents, from_cents, format_money
 from helpers.time import utc_now
 from helpers import telegram
 from helpers.telegram import send_telegram, send_low_stock_alert
+
+
+_UNSET = object()
 
 
 class StockServiceError(Exception):
@@ -34,6 +40,14 @@ class VariantNotFoundError(StockServiceError):
 class ProductNotFoundError(StockServiceError):
     """Raised when a requested base product does not exist."""
     pass
+
+
+def slugify(text_val: str) -> str:
+    """Convert a string into a clean, URL-friendly slug."""
+    if not text_val:
+        return ""
+    text_val = re.sub(r'[^\w\s-]', '', str(text_val).strip().lower())
+    return re.sub(r'[-\s]+', '-', text_val).strip('-')
 
 
 def _escape_html(text_val) -> str:
@@ -93,10 +107,13 @@ def _notify_low_stock(variant: ProductVariant, threshold: int) -> None:
 def attach_view_attributes(product: Optional[Product]) -> Optional[Product]:
     """
     Attach calculated presentation attributes to a Product model instance
-    for storefront templates (default variant, price, formatted price, stock count).
+    for storefront templates (default variant, price, formatted price, stock count, brand/category names).
     """
     if not product:
         return None
+
+    product.brand_name = product.brand.name if product.brand else None
+    product.category_name = product.category.name if product.category else None
 
     active_vars = [v for v in product.variants if v.is_active]
     for v in product.variants:
@@ -127,14 +144,20 @@ def attach_view_attributes(product: Optional[Product]) -> Optional[Product]:
 # 1. Product Queries & Management
 # ==========================================
 
-def get_active_products(category_id: Optional[int] = None, search: Optional[str] = None) -> List[Product]:
+def get_active_products(
+    category_id: Optional[int] = None,
+    brand_id: Optional[int] = None,
+    search: Optional[str] = None
+) -> List[Product]:
     """
     Fetch active products and their linked product variants.
-    Supports optional category filter and search query.
+    Supports optional category filter, brand filter, and search query.
     """
     query = Product.query.filter(Product.is_active == True)
     if category_id is not None:
         query = query.filter(Product.category_id == category_id)
+    if brand_id is not None:
+        query = query.filter(Product.brand_id == brand_id)
     if search:
         term = f"%{search.strip()}%"
         query = query.filter(
@@ -146,13 +169,18 @@ def get_active_products(category_id: Optional[int] = None, search: Optional[str]
     return products
 
 
-def get_all_products(category_id: Optional[int] = None) -> List[Product]:
+def get_all_products(
+    category_id: Optional[int] = None,
+    brand_id: Optional[int] = None
+) -> List[Product]:
     """
     Fetch all products (both active and inactive) for admin management.
     """
     query = Product.query
     if category_id is not None:
         query = query.filter(Product.category_id == category_id)
+    if brand_id is not None:
+        query = query.filter(Product.brand_id == brand_id)
     products = query.order_by(Product.id.asc()).all()
     for p in products:
         attach_view_attributes(p)
@@ -183,7 +211,8 @@ def create_product(
     spec_name: str = "Default",
     cost_price_cents: Optional[Union[int, float, str]] = None,
     low_stock_threshold: Optional[int] = None,
-    is_active: bool = True
+    is_active: bool = True,
+    brand_id: Optional[int] = None
 ) -> Product:
     """
     Create a new product with an initial guaranteed 'Default' variant.
@@ -198,6 +227,7 @@ def create_product(
     product = Product(
         name=clean_name,
         category_id=category_id,
+        brand_id=brand_id,
         description=(description or "").strip() if description else None,
         image=(image or "").strip() if image else None,
         is_active=is_active,
@@ -231,7 +261,8 @@ def update_product(
     category_id: Optional[int] = None,
     description: Optional[str] = None,
     image: Optional[str] = None,
-    is_active: Optional[bool] = None
+    is_active: Optional[bool] = None,
+    brand_id: Union[Optional[int], object] = _UNSET
 ) -> Optional[Product]:
     """
     Update top-level product attributes.
@@ -248,6 +279,9 @@ def update_product(
 
     if category_id is not None:
         product.category_id = category_id
+
+    if brand_id is not _UNSET:
+        product.brand_id = brand_id
 
     if description is not None:
         product.description = description.strip() if description else None
@@ -533,3 +567,271 @@ def restore_stock(variant_id: int, quantity: int) -> bool:
 
     db.session.rollback()
     return False
+
+
+# ==========================================
+# 4. Brand Management CRUD
+# ==========================================
+
+def _generate_unique_brand_slug(name: str, current_id: Optional[int] = None) -> str:
+    """Generate a unique slug for a brand."""
+    base_slug = slugify(name) or "brand"
+    candidate = base_slug
+    counter = 1
+    while True:
+        query = Brand.query.filter_by(slug=candidate)
+        if current_id is not None:
+            query = query.filter(Brand.id != current_id)
+        if not query.first():
+            return candidate
+        candidate = f"{base_slug}-{counter}"
+        counter += 1
+
+
+def get_all_brands() -> List[Brand]:
+    """Fetch all brands ordered alphabetically by name."""
+    return Brand.query.order_by(Brand.name.asc()).all()
+
+
+def get_brand_by_id(brand_id: int) -> Optional[Brand]:
+    """Fetch a single brand by its primary key ID."""
+    return db.session.get(Brand, brand_id)
+
+
+def get_brand_by_slug(slug: str) -> Optional[Brand]:
+    """Fetch a brand by its unique URL slug."""
+    if not slug:
+        return None
+    return Brand.query.filter_by(slug=slug.strip()).first()
+
+
+def create_brand(
+    name: str,
+    slug: Optional[str] = None,
+    description: Optional[str] = None,
+    logo: Optional[str] = None,
+    website: Optional[str] = None
+) -> Brand:
+    """
+    Create a new brand. Auto-generates a unique slug if not provided.
+    """
+    clean_name = (name or "").strip()
+    if not clean_name:
+        raise ValueError("Brand name is required.")
+
+    existing_name = Brand.query.filter_by(name=clean_name).first()
+    if existing_name:
+        raise ValueError(f"Brand '{clean_name}' already exists.")
+
+    if slug and slug.strip():
+        clean_slug = slugify(slug)
+        existing_slug = Brand.query.filter_by(slug=clean_slug).first()
+        if existing_slug:
+            raise ValueError(f"Brand slug '{clean_slug}' already exists.")
+    else:
+        clean_slug = _generate_unique_brand_slug(clean_name)
+
+    brand = Brand(
+        name=clean_name,
+        slug=clean_slug,
+        description=(description or "").strip() if description else None,
+        logo=(logo or "").strip() if logo else None,
+        website=(website or "").strip() if website else None,
+        created_at=utc_now()
+    )
+    db.session.add(brand)
+    db.session.commit()
+    return brand
+
+
+def update_brand(
+    brand_id: int,
+    name: Optional[str] = None,
+    slug: Optional[str] = None,
+    description: Optional[str] = None,
+    logo: Optional[str] = None,
+    website: Optional[str] = None
+) -> Optional[Brand]:
+    """
+    Update brand attributes (name, slug, description, logo, website).
+    """
+    brand = db.session.get(Brand, brand_id)
+    if not brand:
+        return None
+
+    if name is not None:
+        clean_name = name.strip()
+        if not clean_name:
+            raise ValueError("Brand name cannot be empty.")
+        existing = Brand.query.filter(Brand.name == clean_name, Brand.id != brand_id).first()
+        if existing:
+            raise ValueError(f"Brand name '{clean_name}' already in use.")
+        brand.name = clean_name
+
+    if slug is not None:
+        clean_slug = slugify(slug)
+        if not clean_slug:
+            clean_slug = _generate_unique_brand_slug(brand.name, current_id=brand_id)
+        existing = Brand.query.filter(Brand.slug == clean_slug, Brand.id != brand_id).first()
+        if existing:
+            raise ValueError(f"Brand slug '{clean_slug}' already in use.")
+        brand.slug = clean_slug
+
+    if description is not None:
+        brand.description = description.strip() if description else None
+
+    if logo is not None:
+        brand.logo = logo.strip() if logo else None
+
+    if website is not None:
+        brand.website = website.strip() if website else None
+
+    db.session.commit()
+    return brand
+
+
+def delete_brand(brand_id: int) -> bool:
+    """
+    CRITICAL ACCEPTANCE CRITERION:
+    Deleting a brand MUST safely disassociate linked products by setting
+    product.brand_id = None (NULL) BEFORE deleting the brand row,
+    without cascading deletion of any products.
+    """
+    brand = db.session.get(Brand, brand_id)
+    if not brand:
+        return False
+
+    # Disassociate all linked products safely (setting brand_id = NULL)
+    Product.query.filter_by(brand_id=brand_id).update({Product.brand_id: None})
+    db.session.flush()
+
+    db.session.delete(brand)
+    db.session.commit()
+    return True
+
+
+# ==========================================
+# 5. Category Management CRUD
+# ==========================================
+
+def _generate_unique_category_slug(name: str, current_id: Optional[int] = None) -> str:
+    """Generate a unique slug for a category."""
+    base_slug = slugify(name) or "category"
+    candidate = base_slug
+    counter = 1
+    while True:
+        query = Category.query.filter_by(slug=candidate)
+        if current_id is not None:
+            query = query.filter(Category.id != current_id)
+        if not query.first():
+            return candidate
+        candidate = f"{base_slug}-{counter}"
+        counter += 1
+
+
+def get_all_categories() -> List[Category]:
+    """Fetch all categories ordered alphabetically by name."""
+    return Category.query.order_by(Category.name.asc()).all()
+
+
+def get_category_by_id(category_id: int) -> Optional[Category]:
+    """Fetch a single category by its primary key ID."""
+    return db.session.get(Category, category_id)
+
+
+def get_category_by_slug(slug: str) -> Optional[Category]:
+    """Fetch a category by its unique URL slug."""
+    if not slug:
+        return None
+    return Category.query.filter_by(slug=slug.strip()).first()
+
+
+def create_category(name: str, slug: Optional[str] = None) -> Category:
+    """
+    Create a new category. Auto-generates a unique slug if not provided.
+    """
+    clean_name = (name or "").strip()
+    if not clean_name:
+        raise ValueError("Category name is required.")
+
+    existing_name = Category.query.filter_by(name=clean_name).first()
+    if existing_name:
+        raise ValueError(f"Category '{clean_name}' already exists.")
+
+    if slug and slug.strip():
+        clean_slug = slugify(slug)
+        existing_slug = Category.query.filter_by(slug=clean_slug).first()
+        if existing_slug:
+            raise ValueError(f"Category slug '{clean_slug}' already exists.")
+    else:
+        clean_slug = _generate_unique_category_slug(clean_name)
+
+    category = Category(name=clean_name, slug=clean_slug)
+    db.session.add(category)
+    db.session.commit()
+    return category
+
+
+def update_category(
+    category_id: int,
+    name: Optional[str] = None,
+    slug: Optional[str] = None
+) -> Optional[Category]:
+    """
+    Update category attributes (name, slug).
+    """
+    category = db.session.get(Category, category_id)
+    if not category:
+        return None
+
+    if name is not None:
+        clean_name = name.strip()
+        if not clean_name:
+            raise ValueError("Category name cannot be empty.")
+        existing = Category.query.filter(Category.name == clean_name, Category.id != category_id).first()
+        if existing:
+            raise ValueError(f"Category name '{clean_name}' already in use.")
+        category.name = clean_name
+
+    if slug is not None:
+        clean_slug = slugify(slug)
+        if not clean_slug:
+            clean_slug = _generate_unique_category_slug(category.name, current_id=category_id)
+        existing = Category.query.filter(Category.slug == clean_slug, Category.id != category_id).first()
+        if existing:
+            raise ValueError(f"Category slug '{clean_slug}' already in use.")
+        category.slug = clean_slug
+
+    db.session.commit()
+    return category
+
+
+def delete_category(category_id: int, reassign_to_id: Optional[int] = None) -> bool:
+    """
+    Delete a category. If products are linked:
+      - If reassign_to_id is provided, safely reassigns products to that category.
+      - Otherwise, raises ValueError to prevent orphaned products.
+    """
+    category = db.session.get(Category, category_id)
+    if not category:
+        return False
+
+    linked_count = Product.query.filter_by(category_id=category_id).count()
+    if linked_count > 0:
+        if not reassign_to_id:
+            raise ValueError(
+                f"Cannot delete category '{category.name}' because {linked_count} product(s) are linked to it. "
+                "Please reassign those products first."
+            )
+        target_cat = db.session.get(Category, reassign_to_id)
+        if not target_cat:
+            raise ValueError(f"Target reassignment category {reassign_to_id} does not exist.")
+        if target_cat.id == category_id:
+            raise ValueError("Cannot reassign products to the same category being deleted.")
+
+        Product.query.filter_by(category_id=category_id).update({Product.category_id: reassign_to_id})
+        db.session.flush()
+
+    db.session.delete(category)
+    db.session.commit()
+    return True

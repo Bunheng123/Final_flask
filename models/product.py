@@ -6,6 +6,7 @@ class Product(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
+    brand_id = db.Column(db.Integer, db.ForeignKey('brands.id'), nullable=True)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
     image = db.Column(db.String(500), nullable=True)

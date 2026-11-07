@@ -5,6 +5,17 @@
 <!-- Header Bar -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
   <div>
+    <div class="flex items-center gap-2 mb-2">
+      <a href="{{ url_for('admin_bp.admin_products') }}" class="px-3 py-1 rounded-lg text-xs font-bold bg-violet text-white shadow-sm">
+        <i class="bi bi-box-seam-fill"></i> Products
+      </a>
+      <a href="{{ url_for('admin_bp.admin_categories') }}" class="px-3 py-1 rounded-lg text-xs font-semibold bg-card border border-border text-text-muted hover:text-text hover:bg-paper transition">
+        <i class="bi bi-tags-fill"></i> Categories
+      </a>
+      <a href="{{ url_for('admin_bp.admin_brands') }}" class="px-3 py-1 rounded-lg text-xs font-semibold bg-card border border-border text-text-muted hover:text-text hover:bg-paper transition">
+        <i class="bi bi-patch-check-fill"></i> Brands
+      </a>
+    </div>
     <h2 class="font-display text-2xl font-bold text-text">Product & Inventory Management</h2>
     <p class="text-text-muted text-xs mt-0.5">
       Manage catalog items, multi-spec variants, SKU pricing, and low-stock threshold triggers.
@@ -97,7 +108,7 @@
       name="q"
       value="{{ search_query }}"
       placeholder="Search product name..."
-      class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet w-60"
+      class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet w-56"
     />
 
     <select
@@ -112,6 +123,18 @@
       {% endfor %}
     </select>
 
+    <select
+      name="brand_id"
+      class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
+    >
+      <option value="">All Brands</option>
+      {% for b in brands %}
+        <option value="{{ b.id }}" {% if selected_brand == b.id %}selected{% endif %}>
+          {{ b.name }}
+        </option>
+      {% endfor %}
+    </select>
+
     <button
       type="submit"
       class="bg-paper hover:bg-border text-text border border-border px-4 py-2 rounded-lg text-xs font-semibold transition"
@@ -119,7 +142,7 @@
       Filter
     </button>
 
-    {% if search_query or selected_category %}
+    {% if search_query or selected_category or selected_brand %}
       <a
         href="{{ url_for('admin_bp.admin_products') }}"
         class="text-xs text-text-muted hover:text-text underline ml-2"
@@ -137,7 +160,7 @@
       <thead class="bg-paper border-b border-border text-text-muted uppercase tracking-wider text-[11px]">
         <tr>
           <th class="py-3 px-4">Product</th>
-          <th class="py-3 px-4">Category</th>
+          <th class="py-3 px-4">Category & Brand</th>
           <th class="py-3 px-4">Variants / Specs</th>
           <th class="py-3 px-4">Price</th>
           <th class="py-3 px-4">Inventory</th>
@@ -166,11 +189,18 @@
                 </div>
               </td>
 
-              <!-- Category -->
+              <!-- Category & Brand -->
               <td class="py-3 px-4">
-                <span class="bg-paper border border-border px-2.5 py-1 rounded-full text-[11px] font-medium text-text-muted">
-                  {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
-                </span>
+                <div class="flex flex-col gap-1 items-start">
+                  <span class="bg-paper border border-border px-2.5 py-0.5 rounded-full text-[11px] font-medium text-text-muted">
+                    {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
+                  </span>
+                  {% if product.brand %}
+                    <span class="bg-violet/10 text-violet border border-violet/20 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                      <i class="bi bi-patch-check-fill text-[9px]"></i> {{ product.brand.name }}
+                    </span>
+                  {% endif %}
+                </div>
               </td>
 
               <!-- Variants Count & SKUs -->

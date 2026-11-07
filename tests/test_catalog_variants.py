@@ -792,5 +792,340 @@ def test_set_test_prices_cents_service_and_admin_route(client, sample_catalog):
             assert v.price_cents == expected
 
 
+# ==========================================
+# 11. Brand Management & Safe Disassociation Tests
+# ==========================================
+
+def test_brand_service_crud_and_slug(app):
+    """
+    Test Brand CRUD service operations and unique slug auto-generation.
+    """
+    with app.app_context():
+        # 1. Create with auto-generated slug
+        b1 = stock_service.create_brand(
+            name="Apple",
+            description="Consumer electronics & software",
+            website="https://www.apple.com"
+        )
+        assert b1.id is not None
+        assert b1.name == "Apple"
+        assert b1.slug == "apple"
+        assert b1.website == "https://www.apple.com"
+
+        # 2. Duplicate name validation
+        with pytest.raises(ValueError, match="already exists"):
+            stock_service.create_brand(name="Apple")
+
+        # 3. Slug collision resolution for similar name
+        b2 = stock_service.create_brand(name="Apple US")
+        assert b2.slug == "apple-us"
+
+        # 4. Fetch by ID and Slug
+        fetched_by_id = stock_service.get_brand_by_id(b1.id)
+        assert fetched_by_id.name == "Apple"
+        fetched_by_slug = stock_service.get_brand_by_slug("apple")
+        assert fetched_by_slug.id == b1.id
+
+        # 5. Update brand
+        updated = stock_service.update_brand(
+            brand_id=b1.id,
+            name="Apple Inc.",
+            slug="apple-inc",
+            website="https://apple.com"
+        )
+        assert updated.name == "Apple Inc."
+        assert updated.slug == "apple-inc"
+        assert updated.website == "https://apple.com"
+
+        # 6. List all brands
+        all_brands = stock_service.get_all_brands()
+        assert len(all_brands) >= 2
+
+
+def test_brand_deletion_disassociates_products_without_deleting_them(app, sample_catalog):
+    """
+    CRITICAL ACCEPTANCE TEST:
+    Deleting a brand MUST safely disassociate linked products by setting
+    product.brand_id = None (NULL) BEFORE deleting the brand row,
+    without cascading deletion of any products.
+    """
+    with app.app_context():
+        from models.brand import Brand
+
+        # 1. Create a brand
+        sony = stock_service.create_brand(
+            name="Sony Electronics",
+            website="https://www.sony.com"
+        )
+        sony_id = sony.id
+
+        # 2. Create a product linked to this brand
+        headphones = stock_service.create_product(
+            name="WH-1000XM5 Noise Canceling Headphones",
+            category_id=sample_catalog["cat_phones_id"],
+            description="Industry-leading noise cancellation",
+            price_cents=39900,
+            stock=15,
+            sku="SONY-WH5-BLK",
+            spec_name="Black",
+            brand_id=sony_id
+        )
+        prod_id = headphones.id
+
+        # Verify initial brand linkage
+        assert headphones.brand_id == sony_id
+        assert headphones.brand.name == "Sony Electronics"
+
+        # 3. Delete the brand
+        success = stock_service.delete_brand(sony_id)
+        assert success is True
+
+        # 4. CRITICAL VERIFICATION:
+        # A) The brand row is deleted
+        assert db.session.get(Brand, sony_id) is None
+
+        # B) The product STILL EXISTS in the database (NO cascade deletion!)
+        persisted_prod = db.session.get(Product, prod_id)
+        assert persisted_prod is not None
+        assert persisted_prod.name == "WH-1000XM5 Noise Canceling Headphones"
+
+        # C) The product's brand_id is now safely set to None (NULL)
+        assert persisted_prod.brand_id is None
+        assert persisted_prod.brand is None
+
+
+# ==========================================
+# 12. Category Management CRUD & Reassignment Tests
+# ==========================================
+
+def test_category_service_crud_and_reassignment(app):
+    """
+    Test Category CRUD, slug generation, and safe deletion with product reassignment.
+    """
+    with app.app_context():
+        # 1. Create Category
+        cat_audio = stock_service.create_category(name="Audio & Headphones")
+        assert cat_audio.id is not None
+        assert cat_audio.slug == "audio-headphones"
+
+        # 2. Duplicate category validation
+        with pytest.raises(ValueError, match="already exists"):
+            stock_service.create_category(name="Audio & Headphones")
+
+        # 3. Update Category
+        updated_cat = stock_service.update_category(cat_audio.id, name="Audio Equipment", slug="audio-equipment")
+        assert updated_cat.name == "Audio Equipment"
+        assert updated_cat.slug == "audio-equipment"
+
+        # 4. Link a product to this category
+        prod = stock_service.create_product(
+            name="Wireless Earbuds",
+            category_id=cat_audio.id,
+            price_cents=4900,
+            stock=20,
+            sku="AUDIO-001"
+        )
+        prod_id = prod.id
+
+        # 5. Attempting to delete category with linked products without reassign target must fail
+        with pytest.raises(ValueError, match=r"linked to it"):
+            stock_service.delete_category(cat_audio.id)
+
+        # 6. Create fallback category and reassign
+        cat_accessories = stock_service.create_category(name="Accessories")
+        success = stock_service.delete_category(cat_audio.id, reassign_to_id=cat_accessories.id)
+        assert success is True
+
+        # Verify old category is deleted
+        assert stock_service.get_category_by_id(cat_audio.id) is None
+
+        # Verify product was safely reassigned
+        reassigned_prod = db.session.get(Product, prod_id)
+        assert reassigned_prod is not None
+        assert reassigned_prod.category_id == cat_accessories.id
+
+
+# ==========================================
+# 13. Admin Brand & Category Route Tests
+# ==========================================
+
+def test_admin_brand_routes_full_flow(client):
+    """
+    Test full admin workflow for Brands:
+    - Auth guard
+    - GET /admin/brands (listing)
+    - POST /admin/brands/add (create brand)
+    - GET & POST /admin/brands/<id>/edit (update brand)
+    - POST /admin/brands/<id>/delete (safe deletion)
+    """
+    # 1. Unauthenticated access blocked
+    res_unauth = client.get('/admin/brands')
+    assert res_unauth.status_code == 302
+
+    # 2. Authenticate as admin
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+
+    # 3. GET /admin/brands
+    res_list = client.get('/admin/brands')
+    assert res_list.status_code == 200
+    html_list = res_list.data.decode('utf-8')
+    assert "Brand Management" in html_list
+
+    # 4. GET /admin/brands/add
+    res_add_get = client.get('/admin/brands/add')
+    assert res_add_get.status_code == 200
+
+    # 5. POST /admin/brands/add
+    res_add_post = client.post('/admin/brands/add', data={
+        'name': 'Razer Gaming',
+        'slug': 'razer-gaming',
+        'website': 'https://www.razer.com',
+        'description': 'For Gamers. By Gamers.'
+    }, follow_redirects=True)
+    assert res_add_post.status_code == 200
+    html_added = res_add_post.data.decode('utf-8')
+    assert "Razer Gaming" in html_added
+
+    # Fetch created brand ID
+    with client.application.app_context():
+        razer = stock_service.get_brand_by_slug('razer-gaming')
+        assert razer is not None
+        razer_id = razer.id
+
+    # 6. GET /admin/brands/<id>/edit
+    res_edit_get = client.get(f'/admin/brands/{razer_id}/edit')
+    assert res_edit_get.status_code == 200
+
+    # 7. POST /admin/brands/<id>/edit
+    res_edit_post = client.post(f'/admin/brands/{razer_id}/edit', data={
+        'name': 'Razer Inc.',
+        'slug': 'razer-inc',
+        'website': 'https://razer.com',
+        'description': 'Updated description'
+    }, follow_redirects=True)
+    assert res_edit_post.status_code == 200
+    html_edited = res_edit_post.data.decode('utf-8')
+    assert "Razer Inc." in html_edited
+
+    # 8. POST /admin/brands/<id>/delete
+    res_del = client.post(f'/admin/brands/{razer_id}/delete', follow_redirects=True)
+    assert res_del.status_code == 200
+
+    with client.application.app_context():
+        from models.brand import Brand
+        assert db.session.get(Brand, razer_id) is None
+
+
+def test_admin_category_routes_full_flow(client, sample_catalog):
+    """
+    Test full admin workflow for Categories:
+    - GET /admin/categories
+    - POST /admin/categories/add
+    - GET & POST /admin/categories/<id>/edit
+    - POST /admin/categories/<id>/delete
+    """
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+
+    # 1. GET /admin/categories
+    res_list = client.get('/admin/categories')
+    assert res_list.status_code == 200
+    html = res_list.data.decode('utf-8')
+    assert "Category Management" in html
+
+    # 2. GET /admin/categories/add
+    res_add_get = client.get('/admin/categories/add')
+    assert res_add_get.status_code == 200
+
+    # 3. POST /admin/categories/add
+    res_add_post = client.post('/admin/categories/add', data={
+        'name': 'Smart Watches',
+        'slug': 'smart-watches'
+    }, follow_redirects=True)
+    assert res_add_post.status_code == 200
+    assert "Smart Watches" in res_add_post.data.decode('utf-8')
+
+    with client.application.app_context():
+        sw_cat = stock_service.get_category_by_slug('smart-watches')
+        assert sw_cat is not None
+        sw_cat_id = sw_cat.id
+
+    # 4. GET & POST /admin/categories/<id>/edit
+    res_edit_get = client.get(f'/admin/categories/{sw_cat_id}/edit')
+    assert res_edit_get.status_code == 200
+
+    res_edit_post = client.post(f'/admin/categories/{sw_cat_id}/edit', data={
+        'name': 'Wearables & Smart Watches',
+        'slug': 'wearables'
+    }, follow_redirects=True)
+    assert res_edit_post.status_code == 200
+    assert "Wearables" in res_edit_post.data.decode('utf-8')
+    assert "wearables" in res_edit_post.data.decode('utf-8')
+
+    # 5. POST /admin/categories/<id>/delete (no products linked)
+    res_del = client.post(f'/admin/categories/{sw_cat_id}/delete', follow_redirects=True)
+    assert res_del.status_code == 200
+
+    with client.application.app_context():
+        assert stock_service.get_category_by_id(sw_cat_id) is None
+
+
+def test_admin_product_brand_assignment_flow(client, sample_catalog):
+    """
+    Test creating and editing a product with brand assignment in admin controllers.
+    """
+    with client.session_transaction() as sess:
+        sess['is_login'] = True
+        sess['user_id'] = 1
+        sess['role'] = 'admin'
+
+    # Create a brand first
+    with client.application.app_context():
+        dell = stock_service.create_brand(name="Dell Technologies")
+        dell_id = dell.id
+
+    # 1. Create product with brand_id
+    cat_id = sample_catalog["cat_laptops_id"]
+    res_add = client.post('/admin/products/add', data={
+        'name': 'Dell XPS 15',
+        'category_id': str(cat_id),
+        'brand_id': str(dell_id),
+        'sku': 'DELL-XPS-15',
+        'spec_name': '32GB RAM / 1TB SSD',
+        'price': '1999.00',
+        'stock': '7'
+    }, follow_redirects=True)
+    assert res_add.status_code == 200
+
+    # Verify DB
+    with client.application.app_context():
+        prod = Product.query.filter_by(name='Dell XPS 15').first()
+        assert prod is not None
+        assert prod.brand_id == dell_id
+        assert prod.brand.name == "Dell Technologies"
+        prod_id = prod.id
+
+    # 2. Edit product to unassign brand
+    res_edit = client.post(f'/admin/products/{prod_id}/edit', data={
+        'name': 'Dell XPS 15 (Refurbished)',
+        'category_id': str(cat_id),
+        'brand_id': '',  # clear brand
+        'is_active': '1'
+    }, follow_redirects=True)
+    assert res_edit.status_code == 200
+
+    # Verify DB brand cleared
+    with client.application.app_context():
+        updated_prod = db.session.get(Product, prod_id)
+        assert updated_prod.name == 'Dell XPS 15 (Refurbished)'
+        assert updated_prod.brand_id is None
+
+
+
 
 
