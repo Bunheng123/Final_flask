@@ -181,3 +181,63 @@ def admin_toggle_product_status(product_id: int):
     status_str = "activated" if not product.is_active else "deactivated"
     flash(f"Product has been {status_str}.", "info")
     return redirect(url_for('admin_bp.admin_products'))
+
+
+@admin_bp.route('/products/<int:product_id>/edit', methods=['GET', 'POST'], endpoint='admin_edit_product')
+@admin_required
+def admin_edit_product(product_id: int):
+    """
+    GET/POST /admin/products/<id>/edit
+    Full base Product edit (name, category, description, image, is_active).
+    """
+    product = stock_service.get_product_by_id(product_id)
+    if not product:
+        abort(404)
+
+    categories = Category.query.order_by(Category.name.asc()).all()
+
+    if request.method == 'GET':
+        return render_template("admin/products/edit.html", product=product, categories=categories)
+
+    name = request.form.get('name', '').strip()
+    category_id = request.form.get('category_id')
+    description = request.form.get('description', '').strip()
+    image = request.form.get('image', '').strip()
+    is_active = request.form.get('is_active') in ('1', 'true', 'True', True, 'on')
+
+    if not name:
+        flash("Product name is required.", "danger")
+        return render_template("admin/products/edit.html", product=product, categories=categories), 400
+
+    if not category_id or not str(category_id).isdigit():
+        flash("Valid category selection is required.", "danger")
+        return render_template("admin/products/edit.html", product=product, categories=categories), 400
+
+    try:
+        stock_service.update_product(
+            product_id=product_id,
+            name=name,
+            category_id=int(category_id),
+            description=description or None,
+            image=image or None,
+            is_active=is_active
+        )
+        flash(f"Product '{name}' updated successfully.", "success")
+        return redirect(url_for('admin_bp.admin_products'))
+    except Exception as e:
+        flash(f"Failed to update product: {e}", "danger")
+        return render_template("admin/products/edit.html", product=product, categories=categories), 400
+
+
+@admin_bp.route('/products/set-test-prices', methods=['POST'], endpoint='admin_set_test_prices')
+@admin_required
+def admin_set_test_prices():
+    """
+    POST /admin/products/set-test-prices
+    Set all product variant prices to 1¢ / 2¢ ($0.01 / $0.02) for checkout testing.
+    """
+    cents_param = request.form.get('cents')
+    cents_val = int(cents_param) if cents_param and cents_param.isdigit() else None
+    count = stock_service.set_test_prices_cents(cents=cents_val)
+    flash(f"Successfully updated {count} variant price(s) to 1¢ / 2¢ ($0.01 - $0.02) test prices.", "success")
+    return redirect(url_for('admin_bp.admin_products'))

@@ -18,6 +18,12 @@
 
     <div class="flex items-center gap-2">
       <a
+        href="{{ url_for('admin_bp.admin_edit_product', product_id=product.id) }}"
+        class="border border-border bg-card hover:bg-paper text-text px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+      >
+        <i class="bi bi-pencil"></i> Edit Product
+      </a>
+      <a
         href="{{ url_for('front_bp.product', product_id=product.id) }}"
         target="_blank"
         class="border border-border bg-card hover:bg-paper text-text px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
