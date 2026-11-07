@@ -6,12 +6,9 @@ from flask import render_template, request, make_response, current_app, session
 from front import front_bp
 from front.cart import _read_cart_cookie
 from product import get_product_by_id
-<<<<<<< HEAD
 from services.order_service import create_order
 from helpers.money import to_cents
-=======
 from helpers.auth import login_required, current_user
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
 
 # render checkout page, get cart cookie and render to checkout page, calculate subtotal, shipping and total, free shipping for all order
 @front_bp.get('/checkout', endpoint='checkout')
@@ -70,26 +67,6 @@ def do_checkout():
     subtotal = sum(item.get('price', 0) * item.get('qty', 1) for item in cart_before)
     shipping = 0
     total = subtotal + shipping
-<<<<<<< HEAD
-=======
-
-    # Persist the order in the database so it appears in the customer's Order History
-    saved_order = None
-    order_id = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S')
-    try:
-        from services.order_service import create_order
-        from flask import session
-        user_id = session.get('user_id')
-        saved_order = create_order(
-            customer_data=order_info,
-            cart_items=cart_before,
-            user_id=user_id
-        )
-        if saved_order:
-            order_id = saved_order.order_number
-    except Exception as err:
-        current_app.logger.error(f"Failed to persist order to database: {err}")
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
 
     # Persist Order into database via domain service
     created_db_order = None
@@ -108,10 +85,9 @@ def do_checkout():
     response = make_response(render_template(
         'front/checkout.html',
         order_placed=True,
-        order=saved_order,
+        order=created_db_order,
         order_info=order_info,
         order_number=order_number,
-        order=created_db_order,
         cart_items=cart_before,
         subtotal=subtotal,
         shipping=shipping,

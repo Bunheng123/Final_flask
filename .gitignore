@@ -34,6 +34,7 @@ static/images/user/*
 !static/images/user/3_org_stock.jpg
 !static/images/user/3_thumb_stock.jpg
 !static/images/no-image.jpg
+static/images/brand/*
 
 # Flask / environment
 .env

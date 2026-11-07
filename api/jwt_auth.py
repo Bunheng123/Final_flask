@@ -4,7 +4,66 @@ Owner: Developer 5 (Customer Portal, Social Commerce & API Security)
 """
 from functools import wraps
 from datetime import datetime, timezone, timedelta
-import jwt
+try:
+    import jwt
+except ImportError:
+    import base64
+    import json
+    import hmac
+    import hashlib
+
+    class ExpiredSignatureError(Exception):
+        pass
+
+    class InvalidTokenError(Exception):
+        pass
+
+    class _JWTFallback:
+        ExpiredSignatureError = ExpiredSignatureError
+        InvalidTokenError = InvalidTokenError
+
+        @staticmethod
+        def _b64_encode(data: bytes) -> str:
+            return base64.urlsafe_b64encode(data).rstrip(b'=').decode('ascii')
+
+        @staticmethod
+        def _b64_decode(data: str) -> bytes:
+            padding = '=' * (4 - (len(data) % 4)) if (len(data) % 4) else ''
+            return base64.urlsafe_b64decode(data + padding)
+
+        @classmethod
+        def encode(cls, payload: dict, key: str, algorithm: str = "HS256") -> str:
+            header = {"typ": "JWT", "alg": algorithm}
+            header_b64 = cls._b64_encode(json.dumps(header, separators=(',', ':')).encode('utf-8'))
+            payload_b64 = cls._b64_encode(json.dumps(payload, separators=(',', ':')).encode('utf-8'))
+            msg = f"{header_b64}.{payload_b64}".encode('ascii')
+            sig = hmac.new(key.encode('utf-8'), msg, hashlib.sha256).digest()
+            sig_b64 = cls._b64_encode(sig)
+            return f"{header_b64}.{payload_b64}.{sig_b64}"
+
+        @classmethod
+        def decode(cls, token: str, key: str, algorithms: list = None) -> dict:
+            parts = token.split('.')
+            if len(parts) != 3:
+                raise InvalidTokenError("Invalid token format")
+            header_b64, payload_b64, sig_b64 = parts
+            msg = f"{header_b64}.{payload_b64}".encode('ascii')
+            expected_sig = cls._b64_encode(hmac.new(key.encode('utf-8'), msg, hashlib.sha256).digest())
+            if not hmac.compare_digest(sig_b64, expected_sig):
+                raise InvalidTokenError("Signature verification failed")
+            try:
+                payload_json = cls._b64_decode(payload_b64).decode('utf-8')
+                payload = json.loads(payload_json)
+            except Exception as e:
+                raise InvalidTokenError(f"Malformed payload: {e}")
+
+            exp = payload.get("exp")
+            if exp and int(datetime.now(timezone.utc).timestamp()) > exp:
+                raise ExpiredSignatureError("Token has expired")
+            return payload
+
+    jwt = _JWTFallback()
+
 from flask import current_app, request, jsonify, g
 from models.user import User
 

@@ -4,20 +4,6 @@
     {% include 'front/share/header.html' %}
     <title>Order #{{ order.order_number }} — TechStore</title>
   </head>
-<<<<<<< HEAD
-  <body class="bg-slate-900 text-white min-h-screen flex flex-col">
-    {% include 'front/share/navbar.html' %}
-
-    <main class="flex-1 max-w-5xl mx-auto px-6 py-10 w-full">
-      <!-- Flash Messages -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <div class="mb-6 space-y-2">
-            {% for category, message in messages %}
-              <div class="p-4 rounded-2xl text-sm font-medium flex items-center justify-between border {% if category == 'success' %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% else %}bg-rose-500/10 border-rose-500/30 text-rose-300{% endif %}">
-                <span>{{ message }}</span>
-                <button onclick="this.parentElement.remove()" class="text-xs opacity-70 hover:opacity-100">&times;</button>
-=======
   <body class="bg-[#0b1120] text-slate-200 antialiased min-h-screen flex flex-col font-sans selection:bg-indigo-500/30">
     <!-- Navbar -->
     {% include 'front/share/navbar.html' %}
@@ -58,178 +44,12 @@
             {% for category, message in messages %}
               <div class="p-4 rounded-xl text-xs font-medium flex items-center justify-between {% if category == 'error' %}bg-rose-500/10 border border-rose-500/20 text-rose-300{% else %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-300{% endif %}">
                 <span>{{ message }}</span>
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
               </div>
             {% endfor %}
           </div>
         {% endif %}
       {% endwith %}
 
-<<<<<<< HEAD
-      <!-- Top Nav -->
-      <div class="flex items-center justify-between mb-6">
-        <a href="{{ url_for('front_bp.account_orders') }}" class="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition font-medium">
-          <i class="bi bi-arrow-left"></i> Back to My Orders
-        </a>
-        <div>
-          {% if order.status == 'pending' %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Pending Approval
-            </span>
-          {% elif order.status == 'confirmed' %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/30">
-              <i class="bi bi-check2"></i> Confirmed
-            </span>
-          {% elif order.status == 'shipped' %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30">
-              <i class="bi bi-truck"></i> In Transit (Shipped)
-            </span>
-          {% elif order.status == 'delivered' %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-              <i class="bi bi-check-circle-fill"></i> Delivered
-            </span>
-          {% else %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/30">
-              <i class="bi bi-x-circle"></i> Cancelled
-            </span>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- 4-Hour Cancellation Action Banner -->
-      {% if is_cancellable %}
-        <div class="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/30 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex items-start gap-4">
-            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
-              <i class="bi bi-clock-history text-xl"></i>
-            </div>
-            <div>
-              <h3 class="font-bold text-amber-200 text-sm">Self-Service Cancellation Window Active</h3>
-              <p class="text-xs text-amber-300/80 mt-0.5">
-                You can cancel this order within the next <strong>{{ remaining_minutes }} minute(s)</strong> for an instant 100% store credit refund.
-              </p>
-            </div>
-          </div>
-          <div>
-            <form action="{{ url_for('front_bp.cancel_customer_order', order_id=order.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel Order #{{ order.order_number }}? 100% of the funds will be immediately refunded to your account store credit.');">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-              <button type="submit" class="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-5 py-2.5 rounded-2xl transition shadow-lg shadow-rose-500/20 flex items-center gap-2">
-                <i class="bi bi-x-circle-fill"></i> Cancel Order
-              </button>
-            </form>
-          </div>
-        </div>
-      {% elif order.status == 'cancelled' %}
-        <div class="p-5 rounded-3xl bg-rose-500/10 border border-rose-500/30 mb-8 flex items-center gap-3 text-xs text-rose-300">
-          <i class="bi bi-info-circle-fill text-base shrink-0"></i>
-          <span>This order was cancelled. 100% of the funds have been credited back to your account store credit.</span>
-        </div>
-      {% endif %}
-
-      <!-- Order Details Card -->
-      <div class="bg-slate-800/80 border border-slate-700/60 rounded-3xl p-6 md:p-8 shadow-2xl space-y-8">
-        <!-- Header Info -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-700/60 pb-6">
-          <div>
-            <span class="text-xs uppercase tracking-wider text-slate-400 font-bold block mb-1">Receipt & Tracking</span>
-            <h2 class="font-mono text-2xl font-extrabold text-white">{{ order.order_number }}</h2>
-            {% set local_dt = to_local(order.created_at) %}
-            <p class="text-xs text-slate-400 mt-1">Placed on {{ local_dt.strftime('%B %d, %Y at %I:%M %p') if local_dt else '—' }} (GMT+7)</p>
-          </div>
-          <div class="text-right">
-            <span class="text-xs text-slate-400">Total Charged</span>
-            <div class="font-mono text-2xl font-extrabold text-indigo-300">{{ format_money(order.total_cents) }}</div>
-            <div class="text-xs font-mono text-slate-400">៛{{ "{:,.0f}".format((order.total_cents / 100) * 4000) }}</div>
-          </div>
-        </div>
-
-        <!-- Shipping & Payment Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-700/40 text-xs space-y-2">
-            <h4 class="font-bold uppercase tracking-wider text-indigo-400 text-[11px] flex items-center gap-1.5">
-              <i class="bi bi-geo-alt"></i> Delivery Destination
-            </h4>
-            <div class="text-white font-semibold">{{ order.customer_name }}</div>
-            <div class="text-slate-400"><i class="bi bi-telephone"></i> {{ order.phone }}</div>
-            <div class="text-slate-400"><i class="bi bi-envelope"></i> {{ order.email }}</div>
-            <div class="pt-2 border-t border-slate-800 text-slate-300 leading-relaxed">{{ order.address }}</div>
-          </div>
-
-          <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-700/40 text-xs space-y-3">
-            <h4 class="font-bold uppercase tracking-wider text-indigo-400 text-[11px] flex items-center gap-1.5">
-              <i class="bi bi-credit-card"></i> Payment Information
-            </h4>
-            <div class="flex justify-between items-center">
-              <span class="text-slate-400">Method:</span>
-              <span class="px-2.5 py-1 rounded-lg uppercase font-mono font-bold text-white bg-slate-800 border border-slate-700">{{ order.payment_method }}</span>
-            </div>
-            {% if order.coupon_code %}
-              <div class="flex justify-between items-center">
-                <span class="text-slate-400">Promo Code:</span>
-                <span class="font-mono text-emerald-400">{{ order.coupon_code }}</span>
-              </div>
-            {% endif %}
-            <div class="pt-2 border-t border-slate-800 flex justify-between text-slate-400">
-              <span>Status:</span>
-              <span class="font-semibold text-white capitalize">{{ order.status }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Line Items Table -->
-        <div>
-          <h4 class="font-bold text-sm text-slate-200 mb-3 flex items-center gap-2">
-            <i class="bi bi-cart-check"></i> Ordered Items ({{ order.items|length }})
-          </h4>
-          <div class="rounded-2xl border border-slate-700/60 overflow-hidden bg-slate-900/40">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-800/80 border-b border-slate-700/60 uppercase text-[10px] text-slate-400 font-bold">
-                <tr>
-                  <th class="px-4 py-3">Product</th>
-                  <th class="px-4 py-3 font-mono">SKU</th>
-                  <th class="px-4 py-3 text-center">Qty</th>
-                  <th class="px-4 py-3 text-right">Unit Price</th>
-                  <th class="px-4 py-3 text-right">Line Total</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800 font-mono text-[11px]">
-                {% for item in order.items %}
-                  <tr class="hover:bg-slate-800/30 transition">
-                    <td class="px-4 py-3">
-                      <div class="font-sans font-semibold text-white">{{ item.product_name }}</div>
-                      <div class="text-[10px] text-slate-400">{{ item.spec_name }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-slate-400">{{ item.sku }}</td>
-                    <td class="px-4 py-3 text-center font-bold text-white">{{ item.qty }}</td>
-                    <td class="px-4 py-3 text-right text-slate-400">{{ format_money(item.unit_price_cents) }}</td>
-                    <td class="px-4 py-3 text-right font-bold text-white">{{ format_money(item.line_total_cents) }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Pricing Breakdown -->
-        <div class="flex flex-col items-end text-xs space-y-2 pt-4 border-t border-slate-700/60">
-          <div class="flex justify-between w-64 text-slate-400">
-            <span>Subtotal</span>
-            <span class="font-mono text-white">{{ format_money(order.subtotal_cents) }}</span>
-          </div>
-          {% if order.discount_cents and order.discount_cents > 0 %}
-            <div class="flex justify-between w-64 text-slate-400">
-              <span>Discount</span>
-              <span class="font-mono text-emerald-400">-{{ format_money(order.discount_cents) }}</span>
-            </div>
-          {% endif %}
-          <div class="flex justify-between w-64 text-slate-400">
-            <span>Shipping</span>
-            <span class="font-mono text-emerald-400">Free</span>
-          </div>
-          <div class="flex justify-between w-64 pt-3 border-t border-slate-700 font-bold text-sm text-white">
-            <span>Final Total</span>
-            <span class="font-mono text-indigo-300 text-lg">{{ format_money(order.total_cents) }}</span>
-=======
       <!-- 4-Hour Cancellation Grace Period Banner -->
       {% if can_cancel %}
         <div class="mb-8 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-lg shadow-amber-500/5">
@@ -504,20 +324,12 @@
                 <span class="text-white font-medium">USD ($) / KHR (&#x17DB;)</span>
               </div>
             </div>
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
           </div>
         </div>
       </div>
     </main>
 
-<<<<<<< HEAD
-    {% include 'front/share/footer.html' %}
-  </body>
-</html>
-
-=======
     <!-- Footer -->
     {% include 'front/share/footer.html' %}
   </body>
 </html>
->>>>>>> 2718b45bbb7ca49bfa96f02055c6aa3a8e7d2081
