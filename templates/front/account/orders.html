@@ -180,7 +180,7 @@
       {% if orders %}
         <div class="space-y-4">
           {% for order in orders %}
-            {% set is_cancellable = (order.status == 'pending' and (utc_now() - order.created_at).total_seconds() <= 14400) %}
+            {% set is_cancellable = (order.status == 'pending' and order.created_at and (utc_now() - order.created_at).total_seconds() <= 14400) %}
             <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl hover:border-slate-700/80 transition shadow-lg shadow-black/20">
               <!-- Order Header -->
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-800/80">

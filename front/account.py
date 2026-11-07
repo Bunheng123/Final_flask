@@ -154,7 +154,7 @@ def account_orders():
 
     # User statistics for overview metric cards
     all_user_orders = Order.query.filter_by(user_id=user.id).all()
-    total_spent_cents = sum(o.total_cents for o in all_user_orders if o.status != 'cancelled')
+    total_spent_cents = sum((o.total_cents or 0) for o in all_user_orders if o.status != 'cancelled')
     pending_count = sum(1 for o in all_user_orders if o.status == 'pending')
     delivered_count = sum(1 for o in all_user_orders if o.status == 'delivered')
     confirmed_count = sum(1 for o in all_user_orders if o.status in ('confirmed', 'shipped'))
@@ -197,9 +197,13 @@ def account_order_detail(order_number: str):
 
     # 4-hour grace period window calculation
     grace_seconds = 4 * 3600
-    time_since_creation = (utc_now() - order.created_at).total_seconds()
-    can_cancel = (order.status == 'pending') and (time_since_creation <= grace_seconds)
-    time_remaining_seconds = max(0, int(grace_seconds - time_since_creation)) if can_cancel else 0
+    if order.created_at:
+        time_since_creation = (utc_now() - order.created_at).total_seconds()
+        can_cancel = (order.status == 'pending') and (time_since_creation <= grace_seconds)
+        time_remaining_seconds = max(0, int(grace_seconds - time_since_creation)) if can_cancel else 0
+    else:
+        can_cancel = False
+        time_remaining_seconds = 0
 
     return render_template(
         'front/account/order_detail.html',
