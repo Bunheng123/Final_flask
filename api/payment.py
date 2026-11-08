@@ -14,12 +14,12 @@ def api_payment_check(payment_hash):
     """Low-cost KHQR payment polling endpoint for a generated md5 reference."""
     try:
         status = get_payment_status(payment_hash)
-    except RuntimeError:
+    except RuntimeError as e:
         current_app.logger.exception('Unable to check KHQR payment status.')
         return jsonify({
             'success': False,
             'status': 'check_unavailable',
-            'message': 'Payment status is temporarily unavailable.'
+            'message': str(e) or 'Payment status is temporarily unavailable.'
         }), 503
 
     if not status['success']:

@@ -197,8 +197,8 @@ def complete_payment(payment_reference):
         update(Order)
         .where(
             Order.id == order.id,
-            Order.status == 'pending',
-            Order.payment_status == 'pending',
+            Order.status.in_(['pending', 'confirmed']),
+            Order.payment_status.in_(['pending', 'unpaid']),
         )
         .values(
             status='confirmed',
@@ -208,6 +208,9 @@ def complete_payment(payment_reference):
         )
     )
     if updated.rowcount != 1:
+        db.session.refresh(order)
+        if order.payment_status in {'paid', 'refunded'}:
+            return True
         raise RuntimeError('Order payment state changed during KHQR settlement.')
 
     # Dispatch Telegram alert ONLY for confirmed paid orders
