@@ -104,13 +104,19 @@
                   </div>
                 </div>
                 <div id="payment-success-message" class="hidden py-12 text-emerald-700">
-                  <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                  <div id="payment-success-icon-box" class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                   </div>
-                  <h3 class="text-2xl font-bold text-[#1d1d1f]">Order placed successfully!</h3>
-                  <p class="mt-2 text-xs text-[#6e6e73]">Payment received and confirmed.</p>
+                  <h3 id="payment-success-title" class="text-2xl font-bold text-[#1d1d1f]">Order placed successfully!</h3>
+                  <p id="payment-success-desc" class="mt-2 text-xs text-[#6e6e73]">Payment received and confirmed.</p>
+                  <div class="mt-6 flex justify-center gap-3">
+                    <a href="{{ url_for('front_bp.account_order_detail', order_number=order_id) if order_id else url_for('front_bp.account_orders') }}"
+                      class="px-6 py-2.5 rounded-full bg-[#0071e3] text-white font-bold text-xs shadow hover:bg-[#0077ed] transition">
+                      View Order Status
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -513,8 +519,24 @@
             return;
           }
           if (response.status === 403 || result.status === 'ip_restricted') {
-            if (statusMessage) statusMessage.textContent = result.message || '⚠️ Bakong API restricted: NBC only accepts requests from Cambodia IPs. Admin can confirm your order in the dashboard.';
-            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';
+            document.cookie = 'cart_list=; Max-Age=0; Path=/; SameSite=Lax';
+            if (pendingContent) pendingContent.classList.add('hidden');
+            if (successMessage) successMessage.classList.remove('hidden');
+            const successTitle = document.getElementById('payment-success-title');
+            const successDesc = document.getElementById('payment-success-desc');
+            const successIconBox = document.getElementById('payment-success-icon-box');
+            if (successTitle) successTitle.textContent = 'Payment Submitted for Verification!';
+            if (successDesc) successDesc.textContent = 'Your payment was recorded. Because our cloud server is on AWS, our admin will verify and confirm your order shortly.';
+            if (successIconBox) {
+              successIconBox.className = 'mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600 border border-blue-200';
+            }
+            if (banner) {
+              banner.classList.replace('bg-amber-50', 'bg-blue-50');
+              banner.classList.replace('border-amber-300', 'border-blue-300');
+              banner.classList.replace('text-amber-900', 'text-blue-900');
+            }
+            if (title) title.textContent = 'Order Submitted!';
+            if (description) description.textContent = 'Payment recorded. Admin approval pending.';
             return;
           }
           if (response.status === 503) {

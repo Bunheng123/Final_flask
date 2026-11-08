@@ -26,6 +26,18 @@ def api_payment_check(payment_hash):
         if status.get('status') == 'quota_exceeded':
             return jsonify(status), 429
         if status.get('status') == 'ip_restricted':
+            try:
+                from helpers.telegram import send_telegram
+                order = Order.query.filter_by(payment_reference=payment_hash).first()
+                ord_info = f"#{order.order_number}" if order else f"Ref: {payment_hash[:16]}"
+                send_telegram(
+                    f"⚠️ <b>KHQR Payment Submitted (AWS Cloud)</b>\n"
+                    f"Customer submitted payment for <b>{ord_info}</b>.\n"
+                    f"NBC Bakong blocked API check from foreign AWS IP.\n"
+                    f"👉 Please verify your Bakong app and confirm in Admin Dashboard."
+                )
+            except Exception:
+                pass
             return jsonify(status), 403
         return jsonify({
             'success': False,
