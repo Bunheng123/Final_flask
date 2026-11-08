@@ -12,31 +12,32 @@
         border: 1px solid rgba(245, 158, 11, 0.5);
       }
       .filter-pill.active {
-        background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+        background: #0071e3 !important;
         color: #ffffff !important;
-        border-color: rgba(255, 255, 255, 0.3) !important;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        border-color: #0071e3 !important;
+        box-shadow: 0 2px 10px rgba(0, 113, 227, 0.35);
       }
     </style>
   </head>
-  <body class="bg-slate-900 text-white min-h-screen">
+  <body class="bg-white text-[#1d1d1f] min-h-screen font-sans selection:bg-[#0071e3]/20">
     <!-- Navbar -->
     {% include 'front/share/navbar.html' %}
 
-    <div class="max-w-7xl mx-auto px-6 mt-8 mb-16">
-      <!-- Title & Search Control Header -->
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
+    <!-- Floating Sticky Search Bar Control (Full Width Edge-to-Edge with Zero Gap under Navbar) -->
+    <div id="productsStickySearch" class="sticky z-40 w-full bg-white/95 backdrop-blur-xl border-b border-[#d2d2d7] transition-all duration-300 shadow-xs"
+         style="top: var(--nav-height, 68px);">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 class="text-3xl font-extrabold text-white tracking-tight">Explore Products</h2>
-          <p class="text-slate-400 text-sm mt-1">
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-[#1d1d1f] tracking-tight">Explore Products</h2>
+          <p class="text-[#6e6e73] text-xs sm:text-sm mt-0.5">
             Browse our top hardware lineup with real-time instant search & taxonomy filters.
           </p>
         </div>
 
-        <!-- Real-Time Instant Search Input -->
-        <div class="relative w-full md:w-96">
-          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Real-Time Floating Instant Search Input -->
+        <div class="relative w-full md:w-96 group">
+          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#0071e3]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
@@ -49,13 +50,13 @@
               value="{{ q }}"
               placeholder="Instant search products, specs, brands..."
               autocomplete="off"
-              class="w-full pl-10 pr-10 py-3 bg-slate-800/80 border border-slate-700/80 rounded-2xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition shadow-inner"
+              class="w-full pl-11 pr-11 py-2.5 bg-[#f5f5f7] border-2 border-[#d2d2d7] rounded-full text-sm text-[#1d1d1f] placeholder-[#86868b] focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-4 focus:ring-[#0071e3]/15 transition-all shadow-sm group-hover:shadow"
             />
           </form>
           <button
             type="button"
             id="clearSearchBtn"
-            class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white transition {% if not q %}hidden{% endif %}"
+            class="absolute inset-y-0 right-0 pr-4 flex items-center text-[#86868b] hover:text-[#1d1d1f] transition {% if not q %}hidden{% endif %}"
             title="Clear search"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -65,16 +66,19 @@
           </button>
         </div>
       </div>
+    </div>
 
+    <!-- Main Content Container with Filters and Products -->
+    <div class="max-w-7xl mx-auto px-6 pt-6 mb-16">
       <!-- Filters Section -->
-      <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-6 mb-10 backdrop-blur-sm space-y-5">
+      <div class="bg-[#f5f5f7] border border-[#d2d2d7] rounded-3xl p-6 mb-10 shadow-sm space-y-5">
         <!-- Categories Filter -->
         <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-          <span class="text-xs uppercase tracking-wider text-slate-400 font-bold shrink-0 w-24">Category:</span>
+          <span class="text-xs uppercase tracking-wider text-[#6e6e73] font-bold shrink-0 w-24">Category:</span>
           <div class="flex flex-wrap items-center gap-2" id="categoryFilterContainer">
             <button
               type="button"
-              class="filter-pill category-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if not selected_category %}active{% endif %}"
+              class="filter-pill category-pill text-xs font-semibold px-4 py-2 rounded-xl border border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#e8e8ed] transition {% if not selected_category %}active{% endif %}"
               data-category=""
             >
               All Categories
@@ -82,7 +86,7 @@
             {% for cat in categories %}
               <button
                 type="button"
-                class="filter-pill category-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if selected_category|string == cat.name|string or selected_category|string == cat.slug|string or selected_category|string == cat.id|string %}active{% endif %}"
+                class="filter-pill category-pill text-xs font-semibold px-4 py-2 rounded-xl border border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#e8e8ed] transition {% if selected_category|string == cat.name|string or selected_category|string == cat.slug|string or selected_category|string == cat.id|string %}active{% endif %}"
                 data-category="{{ cat.name }}"
                 data-category-slug="{{ cat.slug }}"
                 data-category-id="{{ cat.id }}"
@@ -94,12 +98,12 @@
         </div>
 
         <!-- Brands Filter -->
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800/80">
-          <span class="text-xs uppercase tracking-wider text-slate-400 font-bold shrink-0 w-24">Brand:</span>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-[#d2d2d7]">
+          <span class="text-xs uppercase tracking-wider text-[#6e6e73] font-bold shrink-0 w-24">Brand:</span>
           <div class="flex flex-wrap items-center gap-2" id="brandFilterContainer">
             <button
               type="button"
-              class="filter-pill brand-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if not selected_brand %}active{% endif %}"
+              class="filter-pill brand-pill text-xs font-semibold px-4 py-2 rounded-xl border border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#e8e8ed] transition {% if not selected_brand %}active{% endif %}"
               data-brand=""
             >
               All Brands
@@ -107,7 +111,7 @@
             {% for b in brands %}
               <button
                 type="button"
-                class="filter-pill brand-pill text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white transition {% if selected_brand|string == b.name|string or selected_brand|string == b.slug|string or selected_brand|string == b.id|string %}active{% endif %}"
+                class="filter-pill brand-pill text-xs font-semibold px-4 py-2 rounded-xl border border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#e8e8ed] transition {% if selected_brand|string == b.name|string or selected_brand|string == b.slug|string or selected_brand|string == b.id|string %}active{% endif %}"
                 data-brand="{{ b.name }}"
                 data-brand-slug="{{ b.slug }}"
                 data-brand-id="{{ b.id }}"
@@ -137,7 +141,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7" id="productsGrid">
         {% for product in products %}
         <div
-          class="product-card group relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-900 transition-all duration-500 flex flex-col justify-between"
+          class="product-card group relative overflow-hidden rounded-[28px] border border-[#d2d2d7] bg-white hover:border-[#0071e3]/60 transition-all duration-300 hover:-translate-y-1 shadow-xs hover:shadow-md flex flex-col justify-between"
           data-product-id="{{ product.id }}"
           data-name="{{ product.name }}"
           data-description="{{ product.description or '' }}"
@@ -151,7 +155,7 @@
           <!-- Image Container -->
           <a
             href="{{ url_for('front_bp.product', product_id=product.id) }}"
-            class="relative overflow-hidden block aspect-[4/3] bg-slate-800"
+            class="relative overflow-hidden block aspect-[4/3] bg-[#f5f5f7]"
           >
             {% if product.image %}
               <img
@@ -173,15 +177,15 @@
             <!-- Overlay Gradient -->
             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-            <!-- Category & Brand Badges -->
-            <div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-              <span class="bg-white/10 backdrop-blur-lg border border-white/10 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
+            <!-- Category & Brand Badges (High Visibility) -->
+            <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+              <span class="bg-white/95 text-[#1d1d1f] border border-[#d2d2d7] shadow-sm text-[11px] font-bold px-3 py-1 rounded-full backdrop-blur-md">
                 {{ product.category.name if product.category and product.category.name is defined else (product.category or 'General') }}
               </span>
 
               {% if product.brand %}
-                <span class="bg-violet-500/25 backdrop-blur-lg border border-violet-400/30 text-violet-200 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                <span class="bg-[#0071e3] text-white shadow-sm text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                   </svg>
                   {{ product.brand.name }}
@@ -197,23 +201,23 @@
               class="block"
             >
               <!-- Product Name with XSS-safe highlight -->
-              <h3 class="product-name text-white text-base font-semibold line-clamp-1 group-hover:text-blue-400 transition text-center">
+              <h3 class="product-name text-[#1d1d1f] text-base font-bold line-clamp-1 hover:text-[#0071e3] transition text-center">
                 {{ product.name | highlight_query(q) }}
               </h3>
 
               <!-- Description with XSS-safe highlight -->
-              <p class="product-description text-slate-400 text-xs leading-5 mt-2.5 line-clamp-2 min-h-[40px] text-center">
+              <p class="product-description text-[#6e6e73] text-xs leading-5 mt-2.5 line-clamp-2 min-h-[40px] text-center">
                 {{ (product.description or '') | highlight_query(q) }}
               </p>
             </a>
 
             <!-- Bottom Price & Cart Action -->
-            <div class="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+            <div class="mt-5 pt-4 border-t border-[#d2d2d7] flex items-center justify-between">
               <div>
-                <p class="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
+                <p class="text-[#86868b] text-[10px] uppercase tracking-wider font-semibold">
                   Price
                 </p>
-                <p class="text-xl font-bold text-white">
+                <p class="text-xl font-black text-[#0071e3]">
                   {% if product.price_formatted %}{{ product.price_formatted }}{% else %}${{ product.price }}{% endif %}
                 </p>
               </div>
@@ -221,7 +225,7 @@
               <a href="{{ url_for('front_bp.cart') }}?product_id={{ product.id }}">
                 <button
                   type="button"
-                  class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-500/25 active:scale-95"
+                  class="apple-btn px-4 py-2 text-xs font-bold rounded-full shadow-sm"
                 >
                   Add Cart
                 </button>
@@ -253,10 +257,10 @@
           Clear All Filters
         </button>
       </div>
-
-      <!-- Footer -->
-      {% include 'front/share/footer.html' %}
     </div>
+
+    <!-- Footer -->
+    {% include 'front/share/footer.html' %}
 
     <!-- Real-Time Instant Filtering & XSS-Safe Keyword Highlighting Script -->
     <script>

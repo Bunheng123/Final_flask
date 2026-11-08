@@ -4,144 +4,589 @@
 
 {% block content %}
 
+<!-- Header & Quick Actions -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
   <div>
-    <h2 class="font-display text-2xl font-bold text-text">Welcome back, Amara 👋</h2>
-    <p class="text-text-muted text-xs mt-0.5">Here's what's happening across your store today.</p>
+    <h2 class="font-display text-2xl font-bold text-text">Welcome back, {{ admin_name }} 👋</h2>
+    <p class="text-text-muted text-xs mt-0.5">Real-time performance metrics across your store catalog, orders, and ledger.</p>
   </div>
-  <button class="inline-flex items-center gap-2 bg-violet hover:bg-[#5b4de8] text-white py-2.5 px-5 rounded-lg font-semibold text-xs transition-all shadow-md shadow-violet/20 hover:shadow-violet/35 shrink-0">
-    <i class="bi bi-download"></i> Export report
-  </button>
+  <div class="flex items-center gap-2.5">
+    <a href="{{ url_for('admin_bp.admin_reports') }}" class="inline-flex items-center gap-1.5 bg-paper hover:bg-card border border-border text-text py-2 px-3.5 rounded-xl font-semibold text-xs transition-all shadow-xs">
+      <i class="bi bi-file-earmark-bar-graph"></i>
+      <span>Financial Reports</span>
+    </a>
+    <a href="{{ url_for('admin_bp.admin_orders') }}" class="inline-flex items-center gap-1.5 bg-violet hover:bg-[#5b4de8] text-white py-2 px-4 rounded-xl font-semibold text-xs transition-all shadow-md shadow-violet/20 hover:shadow-violet/30">
+      <i class="bi bi-receipt"></i>
+      <span>Manage Orders</span>
+    </a>
+  </div>
 </div>
 
-<!-- Stat Cards -->
+<!-- Low Stock Warning Banner -->
+{% if low_stock_count > 0 %}
+<div class="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div class="flex items-center gap-3.5">
+    <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 text-lg border border-amber-500/30">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+    </div>
+    <div>
+      <div class="flex items-center gap-2">
+        <h4 class="text-sm font-bold text-text">Inventory Action Required</h4>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+          {{ low_stock_count }} Low SKU{{ 's' if low_stock_count != 1 else '' }}
+        </span>
+        {% if out_of_stock_count > 0 %}
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-500 border border-rose-500/30">
+            {{ out_of_stock_count }} Depleted
+          </span>
+        {% endif %}
+      </div>
+      <p class="text-xs text-text-muted mt-0.5">
+        {{ low_stock_count }} product variant{{ 's are' if low_stock_count != 1 else ' is' }} currently at or below minimum inventory threshold. Please review and restock to ensure customer fulfillment.
+      </p>
+    </div>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    <a href="#low-stock-reorder-table" class="px-3.5 py-2 rounded-xl bg-paper hover:bg-card border border-border text-text font-semibold text-xs transition shadow-xs flex items-center gap-1.5">
+      <i class="bi bi-list-check"></i>
+      <span>Reorder Table</span>
+    </a>
+    <a href="{{ url_for('admin_bp.admin_products') }}?status=low-stock" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5">
+      <i class="bi bi-box-arrow-up-right"></i>
+      <span>Filter Catalog</span>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Primary Metric Stat Cards Grid -->
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-  <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white bg-gradient-to-br from-violet to-[#8b7dfd] shadow-lg shadow-violet/25 shrink-0"><i class="bi bi-currency-dollar"></i></div>
-    <div class="flex flex-col leading-snug">
-      <span class="text-xs text-text-muted font-medium">Revenue (30d)</span>
-      <span class="font-mono text-xl font-bold mt-1 mb-0.5">$48,290</span>
-      <span class="text-[11px] font-semibold text-teal flex items-center gap-0.5"
-        ><i class="bi bi-arrow-up-short text-sm"></i>12.4% vs last month</span
-      >
-    </div>
-  </div>
-  <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white bg-gradient-to-br from-teal to-[#0d9488] shadow-lg shadow-teal/20 shrink-0"><i class="bi bi-people-fill"></i></div>
-    <div class="flex flex-col leading-snug">
-      <span class="text-xs text-text-muted font-medium">New Users</span>
-      <span class="font-mono text-xl font-bold mt-1 mb-0.5">1,204</span>
-      <span class="text-[11px] font-semibold text-teal flex items-center gap-0.5"
-        ><i class="bi bi-arrow-up-short text-sm"></i>4.1% vs last month</span
-      >
-    </div>
-  </div>
-  <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white bg-gradient-to-br from-amber to-[#d97706] shadow-lg shadow-amber/20 shrink-0"><i class="bi bi-bag-check-fill"></i></div>
-    <div class="flex flex-col leading-snug">
-      <span class="text-xs text-text-muted font-medium">Orders</span>
-      <span class="font-mono text-xl font-bold mt-1 mb-0.5">862</span>
-      <span class="text-[11px] font-semibold text-rose flex items-center gap-0.5"
-        ><i class="bi bi-arrow-down-short text-sm"></i>2.3% vs last month</span
-      >
-    </div>
-  </div>
-  <div class="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-lg text-white bg-gradient-to-br from-rose to-[#e11d48] shadow-lg shadow-rose/20 shrink-0"><i class="bi bi-arrow-return-left"></i></div>
-    <div class="flex flex-col leading-snug">
-      <span class="text-xs text-text-muted font-medium">Refund Rate</span>
-      <span class="font-mono text-xl font-bold mt-1 mb-0.5">1.8%</span>
-      <span class="text-[11px] font-semibold text-teal flex items-center gap-0.5"
-        ><i class="bi bi-arrow-down-short text-sm"></i>0.4% improvement</span
-      >
-    </div>
-  </div>
-</div>
-
-<!-- Panels row -->
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-  <!-- Revenue chart -->
-  <div class="xl:col-span-2 bg-card border border-border rounded-2xl p-5 shadow-sm">
-    <div class="flex justify-between items-center mb-5">
-      <h3 class="font-display text-sm font-bold text-text flex items-center">
-        <i class="bi bi-bar-chart-line-fill me-2 text-violet text-base"></i>Revenue Overview
-      </h3>
-      <div class="flex gap-1 bg-paper rounded-full p-1">
-        <button class="border-none bg-card text-text shadow-sm py-1 px-3 rounded-full text-xs font-bold transition-all duration-150">7d</button>
-        <button class="border-none bg-transparent text-text-muted hover:text-text py-1 px-3 rounded-full text-xs font-bold transition-all duration-150">30d</button>
-        <button class="border-none bg-transparent text-text-muted hover:text-text py-1 px-3 rounded-full text-xs font-bold transition-all duration-150">90d</button>
+  <!-- Revenue Card -->
+  <div class="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-violet/40 transition-all flex flex-col justify-between">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Net Revenue</span>
+      <div class="w-9 h-9 rounded-xl bg-violet/10 text-violet flex items-center justify-center text-base border border-violet/20">
+        <i class="bi bi-currency-dollar"></i>
       </div>
     </div>
-    <div class="flex items-end gap-3 md:gap-5 h-[190px] pt-2 pb-6">
-      <div class="flex-1 bg-violet-light hover:bg-violet/25 rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 52%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted whitespace-nowrap">Mon</span>
-      </div>
-      <div class="flex-1 bg-violet-light hover:bg-violet/25 rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 68%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted whitespace-nowrap">Tue</span>
-      </div>
-      <div class="flex-1 bg-violet-light hover:bg-violet/25 rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 45%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted whitespace-nowrap">Wed</span>
-      </div>
-      <div class="flex-1 bg-violet rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 88%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted font-semibold whitespace-nowrap">Thu</span>
-      </div>
-      <div class="flex-1 bg-violet-light hover:bg-violet/25 rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 74%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted whitespace-nowrap">Fri</span>
-      </div>
-      <div class="flex-1 bg-violet-light hover:bg-violet/25 rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 55%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted whitespace-nowrap">Sat</span>
-      </div>
-      <div class="flex-1 bg-violet-light hover:bg-violet/25 rounded-t-lg rounded-b-sm relative transition-all duration-200 group" style="height: 38%">
-        <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-text-muted whitespace-nowrap">Sun</span>
+    <div>
+      <div class="font-mono text-2xl font-black text-text tracking-tight">{{ net_revenue_formatted }}</div>
+      <div class="flex items-center justify-between text-[11px] text-text-muted mt-2 pt-2 border-t border-border">
+        <span>Gross: <b class="text-text font-mono">{{ gross_sales_formatted }}</b></span>
+        <span>AOV: <b class="text-text font-mono">{{ aov_formatted }}</b></span>
       </div>
     </div>
   </div>
 
-  <!-- Recent activity -->
-  <div class="bg-card border border-border rounded-2xl p-5 shadow-sm">
-    <div class="flex justify-between items-center mb-5">
-      <h3 class="font-display text-sm font-bold text-text flex items-center">
-        <i class="bi bi-activity me-2 text-teal text-base"></i>Recent Activity
-      </h3>
-      <button class="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-text-muted hover:text-text hover:bg-paper transition-colors"><i class="bi bi-three-dots"></i></button>
+  <!-- Orders Card -->
+  <div class="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-teal/40 transition-all flex flex-col justify-between">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Total Orders</span>
+      <div class="w-9 h-9 rounded-xl bg-teal/10 text-teal flex items-center justify-center text-base border border-teal/20">
+        <i class="bi bi-bag-check-fill"></i>
+      </div>
     </div>
-    <ul class="list-none p-0 m-0 flex flex-col gap-4">
-      <li class="flex items-start gap-3 text-xs leading-normal">
-        <span class="w-2 h-2 rounded-full bg-teal mt-1.5 shrink-0"></span>
-        <div class="flex-grow">
-          New user <strong>Lena Park</strong> registered<br />
-          <small class="text-[10px] text-text-muted block mt-0.5">2 min ago</small>
-        </div>
-      </li>
-      <li class="flex items-start gap-3 text-xs leading-normal">
-        <span class="w-2 h-2 rounded-full bg-violet mt-1.5 shrink-0"></span>
-        <div class="flex-grow">
-          Order <strong>#ORD-2047</strong> confirmed<br />
-          <small class="text-[10px] text-text-muted block mt-0.5">14 min ago</small>
-        </div>
-      </li>
-      <li class="flex items-start gap-3 text-xs leading-normal">
-        <span class="w-2 h-2 rounded-full bg-amber mt-1.5 shrink-0"></span>
-        <div class="flex-grow">
-          Product <strong>Air Max 90</strong> low stock<br />
-          <small class="text-[10px] text-text-muted block mt-0.5">1 hr ago</small>
-        </div>
-      </li>
-      <li class="flex items-start gap-3 text-xs leading-normal">
-        <span class="w-2 h-2 rounded-full bg-rose mt-1.5 shrink-0"></span>
-        <div class="flex-grow">
-          Refund issued for order <strong>#ORD-1982</strong><br />
-          <small class="text-[10px] text-text-muted block mt-0.5">3 hr ago</small>
-        </div>
-      </li>
-      <li class="flex items-start gap-3 text-xs leading-normal">
-        <span class="w-2 h-2 rounded-full bg-teal mt-1.5 shrink-0"></span>
-        <div class="flex-grow">
-          New user <strong>Marco Silva</strong> registered<br />
-          <small class="text-[10px] text-text-muted block mt-0.5">5 hr ago</small>
-        </div>
-      </li>
-    </ul>
+    <div>
+      <div class="font-mono text-2xl font-black text-text tracking-tight">{{ total_orders }}</div>
+      <div class="flex items-center gap-2 text-[11px] mt-2 pt-2 border-t border-border">
+        <span class="text-teal font-semibold flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal"></span> {{ completed_orders_count }} Completed
+        </span>
+        <span class="text-text-muted">&bull;</span>
+        <span class="text-amber-500 font-semibold flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> {{ pending_orders_count }} Pending
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customers Card -->
+  <div class="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-blue-500/40 transition-all flex flex-col justify-between">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Registered Customers</span>
+      <div class="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-base border border-blue-500/20">
+        <i class="bi bi-people-fill"></i>
+      </div>
+    </div>
+    <div>
+      <div class="font-mono text-2xl font-black text-text tracking-tight">{{ users_count }}</div>
+      <div class="text-[11px] text-text-muted mt-2 pt-2 border-t border-border flex items-center justify-between">
+        <span>Active Coupons: <b class="text-text">{{ active_coupons_count }}</b></span>
+        <span>Refund Rate: <b class="{% if refund_rate > 10 %}text-rose-500{% else %}text-emerald-500{% endif %} font-mono">{{ refund_rate }}%</b></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory & Low Stock Card -->
+  <div class="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-amber-500/40 transition-all flex flex-col justify-between">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Inventory Health</span>
+      <div class="w-9 h-9 rounded-xl {% if low_stock_count > 0 %}bg-amber-500/15 text-amber-500 border border-amber-500/30{% else %}bg-emerald-500/10 text-emerald-500 border border-emerald-500/20{% endif %} flex items-center justify-center text-base">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+      </div>
+    </div>
+    <div>
+      <div class="flex items-baseline gap-2">
+        <span class="font-mono text-2xl font-black {% if low_stock_count > 0 %}text-amber-500{% else %}text-emerald-500{% endif %}">
+          {{ low_stock_count }}
+        </span>
+        <span class="text-xs text-text-muted font-semibold">Low-Stock Alert{{ 's' if low_stock_count != 1 else '' }}</span>
+      </div>
+      <div class="text-[11px] text-text-muted mt-2 pt-2 border-t border-border flex items-center justify-between">
+        <span>Total SKUs: <b class="text-text font-mono">{{ variants_count }}</b></span>
+        <span>Products: <b class="text-text font-mono">{{ products_count }}</b></span>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- Main Dashboard Grid (Chart & Feed + Sidecards) -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+
+  <!-- Left Column (2 Cols): Real Revenue Graph & Live Orders Table -->
+  <div class="xl:col-span-2 space-y-6">
+
+    <!-- Real 7-Day Revenue & Orders Graph Card -->
+    <div class="bg-card border border-border rounded-2xl p-6 shadow-xs">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+        <div>
+          <h3 class="font-display text-base font-bold text-text flex items-center gap-2">
+            <i class="bi bi-bar-chart-line-fill text-violet"></i>
+            <span>7-Day Sales & Order Volume</span>
+          </h3>
+          <p class="text-xs text-text-muted mt-0.5">Real daily revenue and order volume computed directly from store database.</p>
+        </div>
+        <div class="flex items-center gap-3 text-xs">
+          <div class="flex items-center gap-1.5 text-text-muted">
+            <span class="w-2.5 h-2.5 rounded bg-violet"></span>
+            <span>Completed Sales</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-text-muted">
+            <span class="w-2.5 h-2.5 rounded bg-violet/30 border border-violet/40"></span>
+            <span>Zero Sales</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dynamic Bar Chart Container -->
+      <div class="flex items-end gap-3 sm:gap-4 md:gap-6 h-56 pt-6 pb-6 px-2 border-b border-border bg-paper/40 rounded-xl relative">
+        {% for day in chart_days %}
+          <div class="flex-1 flex flex-col items-center h-full justify-end group relative cursor-pointer">
+            <!-- Tooltip Hover Card -->
+            <div class="absolute -top-12 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none bg-black/90 text-white px-2.5 py-1.5 rounded-lg shadow-xl text-[11px] whitespace-nowrap z-30 flex flex-col items-center">
+              <span class="font-bold">{{ day.rev_formatted }}</span>
+              <span class="text-[10px] text-slate-300">{{ day.orders_count }} order{{ 's' if day.orders_count != 1 else '' }} &bull; {{ day.date_str }}</span>
+              <div class="w-2 h-2 bg-black/90 rotate-45 -mb-1 mt-0.5"></div>
+            </div>
+
+            <!-- Value label above bar on desktop -->
+            <span class="text-[10px] font-mono font-bold text-text mb-1 opacity-80 group-hover:opacity-100 transition">
+              {% if day.rev_cents > 0 %}{{ day.rev_formatted }}{% else %}$0{% endif %}
+            </span>
+
+            <!-- The Bar -->
+            <div class="w-full max-w-[42px] rounded-t-xl transition-all duration-300 {% if day.rev_cents > 0 %}bg-violet hover:bg-[#5b4de8] shadow-sm hover:shadow-md{% else %}bg-violet/15 hover:bg-violet/25{% endif %} {% if day.is_today %}ring-2 ring-violet/50{% endif %}"
+                 style="height: {{ day.height_pct }}%;">
+            </div>
+
+            <!-- Day Label below bar -->
+            <div class="mt-2 text-center">
+              <span class="block text-xs font-bold {% if day.is_today %}text-violet{% else %}text-text{% endif %}">
+                {{ day.day_name }}
+              </span>
+              <span class="block text-[10px] text-text-muted font-mono">
+                {{ day.date_str }}
+              </span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="flex items-center justify-between text-[11px] text-text-muted pt-3">
+        <span>Interactive Chart: Hover any bar for daily order breakdown</span>
+        <span class="font-medium text-text">Last 7 Calendar Days</span>
+      </div>
+    </div>
+
+    <!-- Dedicated Low-Stock Reorder Center Table -->
+    <div id="low-stock-reorder-table" class="bg-card border border-border rounded-2xl p-6 shadow-xs">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <div>
+          <h3 class="font-display text-base font-bold text-text flex items-center gap-2">
+            <i class="bi bi-exclamation-octagon-fill text-amber-500"></i>
+            <span>Low-Stock Inventory & Reorder Center</span>
+          </h3>
+          <p class="text-xs text-text-muted mt-0.5">
+            Variants requiring supplier PO or inventory restock based on threshold limits.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-1 rounded-lg text-xs font-bold {% if low_stock_count > 0 %}bg-amber-500/15 text-amber-500 border border-amber-500/30{% else %}bg-emerald-500/15 text-emerald-500 border border-emerald-500/30{% endif %}">
+            {{ low_stock_count }} Low Variant{{ 's' if low_stock_count != 1 else '' }}
+          </span>
+          {% if out_of_stock_count > 0 %}
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">
+              {{ out_of_stock_count }} Depleted
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if low_stock_details %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-text">
+            <thead class="bg-paper border-b border-border text-text-muted uppercase tracking-wider text-[10px]">
+              <tr>
+                <th class="py-2.5 px-3">Product / SKU</th>
+                <th class="py-2.5 px-3">Spec & Category</th>
+                <th class="py-2.5 px-3">Price</th>
+                <th class="py-2.5 px-3">Stock Level</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              {% for item in low_stock_details %}
+                <tr class="hover:bg-paper/50 transition">
+                  <!-- Product & SKU -->
+                  <td class="py-3 px-3">
+                    <div class="flex items-center gap-3">
+                      <img src="{{ item.product_image }}" alt="{{ item.product_name }}"
+                           class="w-10 h-10 rounded-xl object-cover bg-paper border border-border shrink-0"
+                           onerror="this.src='/static/image/placeholder.png'; this.onerror=null;"/>
+                      <div class="min-w-0">
+                        <span class="font-bold text-text block truncate max-w-[200px]" title="{{ item.product_name }}">{{ item.product_name }}</span>
+                        <span class="text-[10px] text-text-muted font-mono">{{ item.sku }}</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- Spec & Category -->
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-violet/10 text-violet border border-violet/20 inline-block mb-0.5">
+                      {{ item.spec_name }}
+                    </span>
+                    <div class="text-[10px] text-text-muted">
+                      <span>{{ item.category_name }}</span> &bull; <span>{{ item.brand_name }}</span>
+                    </div>
+                  </td>
+
+                  <!-- Price -->
+                  <td class="py-3 px-3 font-mono font-bold text-text">
+                    {{ item.price_formatted }}
+                  </td>
+
+                  <!-- Stock Level vs Threshold -->
+                  <td class="py-3 px-3">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono font-bold {% if item.stock <= 0 %}text-rose-500{% else %}text-amber-500{% endif %}">
+                        {{ item.stock }}
+                      </span>
+                      <span class="text-text-muted text-[10px]">/ thresh {{ item.threshold }}</span>
+                    </div>
+                    <!-- Mini Progress Bar -->
+                    <div class="w-24 bg-paper rounded-full h-1.5 overflow-hidden border border-border mt-1">
+                      {% set fill_pct = (item.stock / item.threshold * 100)|round|int if item.threshold > 0 else 0 %}
+                      {% set clamped_pct = fill_pct if fill_pct <= 100 else 100 %}
+                      <div class="h-full rounded-full {% if item.stock <= 0 %}bg-rose-500 w-0{% elif clamped_pct <= 20 %}bg-rose-500{% else %}bg-amber-400{% endif %}"
+                           style="width: {{ clamped_pct }}%;"></div>
+                    </div>
+                  </td>
+
+                  <!-- Status Badge -->
+                  <td class="py-3 px-3">
+                    {% if item.stock <= 0 %}
+                      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Out of Stock
+                      </span>
+                    {% else %}
+                      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Critical Low
+                      </span>
+                    {% endif %}
+                  </td>
+
+                  <!-- Quick Restock Action -->
+                  <td class="py-3 px-3 text-right">
+                    <a href="{{ url_for('admin_bp.admin_product_variants', product_id=item.product_id) }}"
+                       class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-violet/10 text-violet hover:bg-violet hover:text-white font-semibold text-xs transition border border-violet/20"
+                       title="Restock Variant">
+                      <i class="bi bi-plus-circle"></i>
+                      <span>Restock</span>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-8 text-text-muted bg-paper/40 rounded-xl border border-border">
+          <i class="bi bi-shield-check text-emerald-500 text-3xl mb-2 block"></i>
+          <p class="text-xs font-bold text-text">All Catalog SKUs are Well Stocked</p>
+          <p class="text-[11px] text-text-muted mt-0.5">No products or variants currently below their designated reorder threshold.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Live Recent Orders Table -->
+    <div class="bg-card border border-border rounded-2xl p-6 shadow-xs">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="font-display text-base font-bold text-text flex items-center gap-2">
+            <i class="bi bi-clock-history text-teal"></i>
+            <span>Recent Orders Stream</span>
+          </h3>
+          <p class="text-xs text-text-muted mt-0.5">Latest real transactions across COD, KHQR, and Customer Wallet.</p>
+        </div>
+        <a href="{{ url_for('admin_bp.admin_orders') }}" class="text-xs font-bold text-violet hover:underline flex items-center gap-1">
+          <span>View All ({{ total_orders }})</span>
+          <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-text">
+          <thead class="bg-paper border-b border-border text-text-muted uppercase tracking-wider text-[10px]">
+            <tr>
+              <th class="py-2.5 px-3">Order Number</th>
+              <th class="py-2.5 px-3">Customer</th>
+              <th class="py-2.5 px-3">Payment</th>
+              <th class="py-2.5 px-3">Amount</th>
+              <th class="py-2.5 px-3">Status</th>
+              <th class="py-2.5 px-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            {% if recent_orders %}
+              {% for order in recent_orders %}
+                <tr class="hover:bg-paper/50 transition">
+                  <!-- Order Number & Date -->
+                  <td class="py-3 px-3 font-mono font-bold">
+                    <span class="text-violet block">{{ order.order_number }}</span>
+                    <span class="text-[10px] text-text-muted font-normal">
+                      {% if order.created_at and to_local is defined %}
+                        {{ to_local(order.created_at).strftime('%b %d, %I:%M %p') }}
+                      {% elif order.created_at %}
+                        {{ order.created_at.strftime('%b %d, %Y') }}
+                      {% endif %}
+                    </span>
+                  </td>
+
+                  <!-- Customer Name -->
+                  <td class="py-3 px-3">
+                    <span class="font-bold text-text block">{{ order.customer_name }}</span>
+                    <span class="text-[10px] text-text-muted font-mono">{{ order.phone }}</span>
+                  </td>
+
+                  <!-- Payment Method -->
+                  <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-paper border border-border text-text">
+                      {{ order.payment_method or 'COD' }}
+                    </span>
+                  </td>
+
+                  <!-- Total Amount -->
+                  <td class="py-3 px-3 font-mono font-bold text-text">
+                    {% if format_money is defined %}
+                      {{ format_money(order.total_cents) }}
+                    {% else %}
+                      ${{ "%.2f"|format(order.total_cents / 100) }}
+                    {% endif %}
+                  </td>
+
+                  <!-- Status Badge -->
+                  <td class="py-3 px-3">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold {% if order.status == 'delivered' %}bg-emerald-500/15 text-emerald-500 border border-emerald-500/30{% elif order.status == 'shipped' %}bg-blue-500/15 text-blue-500 border border-blue-500/30{% elif order.status == 'confirmed' %}bg-teal-500/15 text-teal-500 border border-teal-500/30{% elif order.status == 'cancelled' %}bg-rose-500/15 text-rose-500 border border-rose-500/30{% else %}bg-amber-500/15 text-amber-500 border border-amber-500/30{% endif %}">
+                      <span class="w-1.5 h-1.5 rounded-full {% if order.status == 'delivered' %}bg-emerald-500{% elif order.status == 'cancelled' %}bg-rose-500{% elif order.status == 'confirmed' %}bg-teal-500{% elif order.status == 'shipped' %}bg-blue-500{% else %}bg-amber-400 animate-pulse{% endif %}"></span>
+                      {{ order.status|capitalize }}
+                    </span>
+                  </td>
+
+                  <!-- Action -->
+                  <td class="py-3 px-3 text-right">
+                    <a href="{{ url_for('admin_bp.admin_orders') }}" class="text-xs font-semibold text-violet hover:underline inline-flex items-center gap-1">
+                      <span>View</span>
+                      <i class="bi bi-box-arrow-up-right text-[10px]"></i>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="6" class="py-8 text-center text-text-muted text-xs">No orders recorded yet.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right Column (1 Col): Low-Stock Alert List & Payment Distribution -->
+  <div class="space-y-6">
+
+    <!-- Real Inventory Health Breakdown Card -->
+    <div class="bg-card border border-border rounded-2xl p-5 shadow-xs">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-display text-sm font-bold text-text flex items-center gap-2">
+          <i class="bi bi-speedometer2 text-emerald-500"></i>
+          <span>Inventory Health Ratio</span>
+        </h3>
+        <span class="font-mono text-xs font-bold {% if inventory_health_percent >= 80 %}text-emerald-500{% elif inventory_health_percent >= 50 %}text-amber-500{% else %}text-rose-500{% endif %}">
+          {{ inventory_health_percent }}% Healthy
+        </span>
+      </div>
+
+      <!-- Health Ratio Bar -->
+      <div class="w-full bg-paper rounded-full h-2.5 overflow-hidden border border-border mb-3 flex">
+        <div class="h-full bg-emerald-500 transition-all duration-300" style="width: {{ inventory_health_percent }}%;" title="{{ healthy_skus_count }} Healthy SKUs"></div>
+        <div class="h-full bg-amber-400 transition-all duration-300" style="width: {{ (100 - inventory_health_percent) }}%;" title="{{ low_stock_count }} Low SKUs"></div>
+      </div>
+
+      <!-- Breakdown Stats Grid -->
+      <div class="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center">
+        <div class="p-2 rounded-xl bg-paper">
+          <span class="block text-[10px] text-text-muted uppercase tracking-wider">Total Units</span>
+          <span class="font-mono font-bold text-text text-xs mt-0.5">{{ total_inventory_units }}</span>
+        </div>
+        <div class="p-2 rounded-xl bg-paper">
+          <span class="block text-[10px] text-emerald-600 uppercase tracking-wider">Healthy</span>
+          <span class="font-mono font-bold text-emerald-600 text-xs mt-0.5">{{ healthy_skus_count }}</span>
+        </div>
+        <div class="p-2 rounded-xl bg-paper">
+          <span class="block text-[10px] {% if low_stock_count > 0 %}text-amber-500{% else %}text-text-muted{% endif %} uppercase tracking-wider">Low Stock</span>
+          <span class="font-mono font-bold {% if low_stock_count > 0 %}text-amber-500{% else %}text-text-muted{% endif %} text-xs mt-0.5">{{ low_stock_count }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Real Low Stock Inventory Alert Panel -->
+    <div class="bg-card border border-border rounded-2xl p-5 shadow-xs">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display text-sm font-bold text-text flex items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill text-amber-500"></i>
+          <span>Low-Stock Inventory Alerts</span>
+        </h3>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+          {{ low_stock_count }} Low
+        </span>
+      </div>
+
+      {% if low_stock_preview %}
+        <div class="space-y-3">
+          {% for variant in low_stock_preview %}
+            {% set thresh = variant.low_stock_threshold if variant.low_stock_threshold is not none else 5 %}
+            <div class="p-3 rounded-xl bg-paper border border-border flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-bold text-xs text-text truncate">
+                  {{ variant.product.name if variant.product else 'Product' }}
+                </p>
+                <div class="flex items-center gap-2 mt-0.5 text-[10px] text-text-muted font-mono">
+                  <span>{{ variant.sku }}</span>
+                  <span>&bull;</span>
+                  <span>{{ variant.spec_name }}</span>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if variant.stock <= 0 %}bg-rose-500/15 text-rose-500 border border-rose-500/30{% else %}bg-amber-500/15 text-amber-500 border border-amber-500/30{% endif %}">
+                    Stock: {{ variant.stock }}
+                  </span>
+                  <a href="{{ url_for('admin_bp.admin_product_variants', product_id=variant.product_id) }}" class="p-1 rounded bg-violet/10 text-violet hover:bg-violet hover:text-white transition" title="Restock Variant">
+                    <i class="bi bi-plus-lg text-xs"></i>
+                  </a>
+                </div>
+                <span class="text-[9px] text-text-muted block mt-0.5">Threshold: {{ thresh }}</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs">
+          <a href="{{ url_for('admin_bp.admin_products') }}?status=low-stock" class="text-violet hover:underline font-semibold flex items-center gap-1">
+            <span>Filter Low Stock Products</span>
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      {% else %}
+        <div class="text-center py-6 text-text-muted">
+          <i class="bi bi-check-circle-fill text-emerald-500 text-2xl mb-1 block"></i>
+          <p class="text-xs font-semibold text-text">Inventory is fully healthy!</p>
+          <p class="text-[11px] text-text-muted mt-0.5">No products currently below their threshold.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Real Payment Methods Distribution -->
+    <div class="bg-card border border-border rounded-2xl p-5 shadow-xs">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display text-sm font-bold text-text flex items-center gap-2">
+          <i class="bi bi-pie-chart-fill text-violet"></i>
+          <span>Payment Methods Split</span>
+        </h3>
+        <span class="text-[11px] text-text-muted font-mono">{{ total_orders }} Total</span>
+      </div>
+
+      {% if payment_distribution %}
+        <div class="space-y-3">
+          {% for p in payment_distribution %}
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-bold text-text flex items-center gap-1.5">
+                  {% if p.name == 'KHQR' or p.name == 'QR' %}
+                    <i class="bi bi-qr-code text-[#0071e3]"></i> Bakong KHQR
+                  {% elif p.name == 'WALLET' %}
+                    <i class="bi bi-wallet2 text-teal"></i> Customer Wallet
+                  {% elif p.name == 'SPLIT' %}
+                    <i class="bi bi-pie-chart text-violet"></i> Wallet + KHQR
+                  {% else %}
+                    <i class="bi bi-cash-stack text-amber-500"></i> Cash on Delivery
+                  {% endif %}
+                </span>
+                <span class="font-mono text-text-muted text-[11px]">
+                  {{ p.count }} order{{ 's' if p.count != 1 else '' }} ({{ p.percent }}%)
+                </span>
+              </div>
+              <div class="w-full bg-paper rounded-full h-2 overflow-hidden border border-border">
+                <div class="h-full rounded-full transition-all duration-300 {% if p.name == 'KHQR' or p.name == 'QR' %}bg-[#0071e3]{% elif p.name == 'WALLET' %}bg-teal{% elif p.name == 'SPLIT' %}bg-violet{% else %}bg-amber-400{% endif %}"
+                     style="width: {{ p.percent }}%;"></div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-xs text-text-muted text-center py-4">No payment data recorded yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Store Management Quick Links -->
+    <div class="bg-card border border-border rounded-2xl p-5 shadow-xs">
+      <h3 class="font-display text-sm font-bold text-text mb-3 flex items-center gap-2">
+        <i class="bi bi-lightning-charge-fill text-amber-500"></i>
+        <span>Management Shortcuts</span>
+      </h3>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <a href="{{ url_for('admin_bp.admin_add_product') }}" class="p-3 rounded-xl bg-paper hover:bg-border/60 border border-border flex flex-col items-center justify-center text-center gap-1.5 font-semibold text-text transition">
+          <i class="bi bi-plus-circle text-violet text-lg"></i>
+          <span>Add Product</span>
+        </a>
+        <a href="{{ url_for('admin_bp.admin_coupons') }}" class="p-3 rounded-xl bg-paper hover:bg-border/60 border border-border flex flex-col items-center justify-center text-center gap-1.5 font-semibold text-text transition">
+          <i class="bi bi-ticket-perforated text-emerald-500 text-lg"></i>
+          <span>Discount Codes</span>
+        </a>
+        <a href="{{ url_for('admin_bp.admin_products') }}" class="p-3 rounded-xl bg-paper hover:bg-border/60 border border-border flex flex-col items-center justify-center text-center gap-1.5 font-semibold text-text transition">
+          <i class="bi bi-boxes text-blue-500 text-lg"></i>
+          <span>Product Catalog</span>
+        </a>
+        <a href="{{ url_for('front_bp.home') }}" target="_blank" class="p-3 rounded-xl bg-paper hover:bg-border/60 border border-border flex flex-col items-center justify-center text-center gap-1.5 font-semibold text-text transition">
+          <i class="bi bi-shop text-teal text-lg"></i>
+          <span>View Storefront</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
 {% endblock %}

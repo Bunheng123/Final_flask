@@ -3,351 +3,384 @@
 
 <head>
   {% include 'front/share/header.html' %}
-  <title>Checkout - TechStore</title>
+  <title>Checkout — TechStore</title>
 </head>
 
-<body class="bg-slate-900 text-white min-h-screen">
-  <!-- Navbar -->
-  <nav class="bg-slate-950">
+<body class="bg-white text-[#1d1d1f] antialiased min-h-screen flex flex-col font-sans selection:bg-[#0071e3]/20">
+  <!-- Minimalist Apple Navbar -->
+  <nav class="bg-[#f5f5f7] border-b border-[#d2d2d7] sticky top-0 z-40 shadow-xs">
     <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-      <a href="{{ url_for('front_bp.home') }}">
-        <h1 class="text-xl font-bold">TechStore</h1>
+      <a href="{{ url_for('front_bp.home') }}" class="text-lg font-extrabold text-[#1d1d1f] flex items-center gap-2">
+        <span class="w-8 h-8 rounded-xl bg-[#0071e3] text-white flex items-center justify-center font-bold text-xs shadow-xs">TS</span>
+        <span>TechStore</span>
       </a>
-      <a href="{{ url_for('front_bp.cart') }}" class="text-blue-400 hover:underline">← Back to Cart</a>
+      <a href="{{ url_for('front_bp.cart') }}" class="text-xs font-bold text-[#0071e3] hover:text-[#0077ed] transition flex items-center gap-1.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Back to Cart
+      </a>
     </div>
   </nav>
 
-  <!-- Checkout Layout -->
-  <form method="post" action="{{ url_for('front_bp.do_checkout') }}"
-    class="max-w-7xl mx-auto px-6 py-10 grid lg:grid-cols-3 gap-8">
-    <!-- CSRF Token -->
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex-grow w-full bg-white">
+    <!-- Checkout Layout -->
+    <form method="post" action="{{ url_for('front_bp.do_checkout') }}"
+      class="grid lg:grid-cols-3 gap-8">
+      <!-- CSRF Token -->
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <!-- Billing Info / Order Confirmation Column -->
-    <div class="lg:col-span-2 space-y-6">
-      {% if order_placed %}
-        <!-- Order Success Banner -->
-        <div id="order-status-banner"
-          class="p-6 rounded-3xl {{ 'bg-amber-500/10 border-amber-500/20 text-amber-200' if base64_uri else 'bg-emerald-500/10 border-emerald-500/20 text-emerald-200' }} border shadow-xl">
-          <div class="flex items-center gap-3">
-            <div id="order-status-icon"
-              class="w-10 h-10 rounded-full {{ 'bg-amber-500/20 text-amber-400 border-amber-500/30' if base64_uri else 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }} flex items-center justify-center border">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <div>
-              <h2 id="order-status-title" class="text-xl font-bold text-white">
-                {{ 'Order awaiting payment' if base64_uri else 'Order placed successfully!' }}
-              </h2>
-              <p id="order-status-description" class="text-slate-300 text-sm mt-0.5">
-                Order reference: <span class="font-mono text-indigo-300 font-bold">#{{ order_id }}</span>
-              </p>
-            </div>
-          </div>
-          {% if order_id %}
-            <div class="mt-4 pt-3 border-t border-white/10 flex items-center gap-3">
-              <a href="{{ url_for('front_bp.account_order_detail', order_number=order_id) }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md shadow-indigo-600/30">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                View Order in History &rarr;
-              </a>
-            </div>
-          {% endif %}
-        </div>
-
-        {% if base64_uri and (order_info.payment in ['qr', 'khqr', 'split'] or (payment_result and payment_result.payment_mode in ['qr', 'khqr', 'split'])) %}
-          <div id="khqr-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
-            role="dialog" aria-modal="true" aria-labelledby="khqr-modal-title">
-            <div id="khqr-payment-panel" data-payment-check-url="{{ payment_check_url }}" data-payment-cancel-url="{{ payment_cancel_url }}" data-checkout-url="{{ checkout_url }}"
-              class="w-full max-w-4xl rounded-3xl border border-indigo-500/30 bg-slate-800 p-6 text-center shadow-2xl sm:p-8">
-              <div id="payment-pending-content">
-                <div class="flex items-center justify-between gap-4">
-                  <h3 id="khqr-modal-title" class="text-left text-lg font-bold text-white">Scan to pay with KHQR</h3>
-                  <button id="cancel-khqr-payment" type="button"
-                    class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-slate-400 hover:text-white">
-                    Cancel
-                  </button>
-                </div>
-                <p class="mb-5 mt-1 text-left text-sm text-slate-400">
-                  Open your Bakong, ABA, ACLEDA, Wing, or any Cambodian banking app and scan this QR code.
-                </p>
-
-                <div class="rounded-2xl bg-slate-950 p-6">
-                  <img src="{{ base64_uri }}" alt="Bakong KHQR Payment Code" class="mx-auto h-64 w-64 rounded-2xl bg-white object-contain p-4 shadow-xl" />
-                  <div class="mt-5 space-y-1">
-                    <p class="text-xs uppercase tracking-wider text-slate-400">Total to pay</p>
-                    <p class="text-3xl font-extrabold text-indigo-300">{{ khr_format(payment_result.khqr_remaining_khr if payment_result else total_khr) }}</p>
-                    <p class="text-xs text-slate-400">{{ usd_format(payment_result.khqr_remaining_khr if payment_result else total_khr) }}</p>
-                  </div>
-                  <div class="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
-                    <span id="payment-status-dot" class="h-2 w-2 rounded-full bg-amber-400"></span>
-                    <span id="payment-status-message">Scan with your mobile banking app, then click below to verify.</span>
-                  </div>
-
-                  <!-- Explicit Action Buttons (Conserves Bakong 100 req/day quota) -->
-                  <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <button id="verify-payment-btn" type="button"
-                      class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span id="verify-btn-text">I Have Paid — Verify Order</span>
-                    </button>
-                    <button id="cancel-payment-modal-btn" type="button"
-                      class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm border border-slate-700 transition cursor-pointer">
-                      Cancel Order
-                    </button>
-                  </div>
-                </div>
+      <!-- Billing Info / Order Confirmation Column -->
+      <div class="lg:col-span-2 space-y-6">
+        {% if order_placed %}
+          <!-- Order Success Banner -->
+          <div id="order-status-banner"
+            class="p-6 rounded-3xl {{ 'bg-amber-50 border-amber-300 text-amber-900' if base64_uri else 'bg-emerald-50 border-emerald-300 text-emerald-900' }} border shadow-sm">
+            <div class="flex items-center gap-3.5">
+              <div id="order-status-icon"
+                class="w-11 h-11 rounded-2xl {{ 'bg-amber-500/15 text-amber-600 border-amber-500/30' if base64_uri else 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' }} flex items-center justify-center border shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
               </div>
-              <div id="payment-success-message" class="hidden py-12 text-emerald-300">
-                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                </div>
-                <h3 class="text-2xl font-bold text-white">Order placed successfully!</h3>
-                <p class="mt-2 text-sm text-slate-300">Payment received and confirmed.</p>
-              </div>
-            </div>
-          </div>
-        {% endif %}
-
-        <!-- Order Snapshot Details -->
-        <div class="p-6 rounded-3xl bg-slate-800 border border-slate-700 text-slate-200">
-          <h3 class="text-lg font-bold text-white mb-4">Delivery & Contact Snapshot</h3>
-          <div class="grid sm:grid-cols-2 gap-4 text-sm">
-            <div>
-              <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Customer Name</span>
-              <span class="font-medium text-white">{{ order_info.first_name if order_info else '' }} {{ order_info.last_name if order_info else '' }}</span>
-            </div>
-            <div>
-              <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Phone</span>
-              <span class="font-medium text-white">{{ order_info.phone if order_info else '' }}</span>
-            </div>
-            <div>
-              <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Email</span>
-              <span class="font-medium text-white">{{ order_info.email if order_info else '' }}</span>
-            </div>
-            <div>
-              <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Payment Method</span>
-              <span class="font-medium text-white uppercase">{{ order_info.payment if order_info else '' }}</span>
-            </div>
-            <div class="sm:col-span-2">
-              <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Delivery Address</span>
-              <span class="font-medium text-white">{{ order_info.address if order_info else '' }}</span>
-            </div>
-          </div>
-        </div>
-
-      {% else %}
-        <!-- Standard Checkout Form -->
-        <h2 class="text-2xl font-bold">Billing Details</h2>
-        {% if checkout_error %}
-          <div role="alert" class="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {{ checkout_error }}
-          </div>
-        {% endif %}
-
-        <div class="grid md:grid-cols-2 gap-4">
-          <input type="text" name="first_name" placeholder="First Name" value="{% if customer_defaults is defined and customer_defaults.first_name %}{{ customer_defaults.first_name }}{% elif user is defined and user %}{{ user.username }}{% endif %}" class="p-3 bg-slate-800 rounded" required />
-          <input type="text" name="last_name" placeholder="Last Name" value="{% if customer_defaults is defined and customer_defaults.last_name %}{{ customer_defaults.last_name }}{% endif %}" class="p-3 bg-slate-800 rounded" />
-        </div>
-
-        <input type="text" name="address" placeholder="Address" value="{% if customer_defaults is defined and customer_defaults.address %}{{ customer_defaults.address }}{% endif %}" class="w-full p-3 bg-slate-800 rounded" required />
-
-        <div class="grid md:grid-cols-2 gap-4">
-          <input type="text" name="phone" placeholder="Phone" value="{% if customer_defaults is defined and customer_defaults.phone %}{{ customer_defaults.phone }}{% endif %}" class="p-3 bg-slate-800 rounded" required />
-          <input type="email" name="email" placeholder="Email" value="{% if customer_defaults is defined and customer_defaults.email %}{{ customer_defaults.email }}{% elif user is defined and user %}{{ user.email }}{% endif %}" class="p-3 bg-slate-800 rounded" required />
-        </div>
-
-        <h2 class="text-xl font-bold mt-6">Payment Method</h2>
-
-        <div class="space-y-3">
-          <label class="flex items-center gap-3 bg-slate-800 p-3 rounded cursor-pointer border border-transparent hover:border-slate-700">
-            <input type="radio" name="payment" value="cod" id="payment-cod" checked onchange="togglePaymentMethod('cod')" />
-            <span>Cash on Delivery</span>
-          </label>
-
-          <label class="flex items-center gap-3 bg-slate-800 p-3 rounded cursor-pointer border border-indigo-500/40 hover:border-indigo-500/60">
-            <input type="radio" name="payment" value="qr" id="payment-qr" onchange="togglePaymentMethod('qr')" />
-            <span class="flex items-center gap-2">
-              <span>QR Payment (Bakong KHQR)</span>
-              <span class="text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">Instant</span>
-            </span>
-          </label>
-
-          {% if is_authenticated %}
-            <label class="flex items-center gap-3 bg-slate-800 p-3 rounded cursor-pointer border border-slate-700 hover:border-indigo-500/60">
-              <input type="radio" name="payment" value="wallet" id="payment-wallet" onchange="togglePaymentMethod('wallet')" />
-              <span>Wallet only — {{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}</span>
-            </label>
-
-            <label class="flex items-center gap-3 bg-slate-800 p-3 rounded cursor-pointer border border-slate-700 hover:border-indigo-500/60">
-              <input type="radio" name="payment" value="split" id="payment-split" onchange="togglePaymentMethod('split')" />
-              <span>Wallet + KHQR — use available wallet balance first</span>
-            </label>
-          {% endif %}
-        </div>
-
-        <div class="grid gap-4 mt-4">
-          <!-- COD Info Panel -->
-          <div id="panel-cod" class="p-4 rounded-3xl bg-slate-800 border border-slate-700">
-            <p class="font-semibold text-white">
-              Pay with cash when your order arrives
-            </p>
-            <p class="text-slate-400 text-sm mt-2">
-              Choose Cash on Delivery and pay the courier directly. Keep the
-              exact amount ready for a faster delivery.
-            </p>
-          </div>
-
-          <!-- QR Payment Panel -->
-          <div id="panel-qr" class="hidden p-6 rounded-3xl bg-slate-800 border border-indigo-500/30 shadow-xl">
-            <div class="flex items-center justify-between gap-4 mb-4">
               <div>
-                <p class="font-semibold text-white text-base">Scan to pay with KHQR</p>
-                <p class="text-slate-400 text-sm mt-1">
-                  {% if base64_uri %}
-                    Open your Bakong, ABA, ACLEDA, Wing, or any Cambodian banking app and scan this QR code.
-                  {% else %}
-                    Place your order to generate a one-time dynamic payment QR code.
-                  {% endif %}
+                <h2 id="order-status-title" class="text-xl font-bold text-[#1d1d1f]">
+                  {{ 'Order awaiting payment' if base64_uri else 'Order placed successfully!' }}
+                </h2>
+                <p id="order-status-description" class="text-[#6e6e73] text-xs mt-1">
+                  Order reference: <span class="font-mono text-[#0071e3] font-bold">#{{ order_id }}</span>
                 </p>
               </div>
             </div>
-
-            {% if base64_uri %}
-              <div class="rounded-2xl bg-slate-950 p-6 flex flex-col items-center justify-center border border-white/5">
-                <div class="bg-white p-4 rounded-2xl shadow-2xl shadow-black/50 inline-block">
-                  <img src="{{ base64_uri }}"
-                       alt="Bakong KHQR Payment Code"
-                       class="w-56 h-56 object-contain block" />
-                </div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold mt-5">Total to Pay</p>
-                <p class="text-2xl font-extrabold text-indigo-300 mt-1">{{ khr_format(total_khr) if khr_format is defined else total_khr }}</p>
-                <p class="text-xs text-slate-400">{{ usd_format(total_khr) if usd_format is defined else '' }}</p>
-                <div class="mt-4 flex items-center gap-2 text-xs text-slate-400">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-                  <span>Scan with Bakong or any Cambodian banking app</span>
-                </div>
-              </div>
-            {% else %}
-              <div class="rounded-2xl border border-dashed border-slate-600 bg-slate-900/60 px-6 py-8 text-center">
-                <p class="font-medium text-slate-300">Your payment QR code will be ready after you place the order.</p>
-                <p class="mt-2 text-sm text-slate-400">No payment is requested until the code is generated.</p>
+            {% if order_id %}
+              <div class="mt-4 pt-4 border-t border-[#d2d2d7]/60 flex items-center gap-3">
+                <a href="{{ url_for('front_bp.account_order_detail', order_number=order_id) }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold transition shadow-xs">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  View Order in History &rarr;
+                </a>
               </div>
             {% endif %}
           </div>
 
-          {% if is_authenticated %}
-            <div id="panel-wallet" class="hidden p-4 rounded-3xl bg-slate-800 border border-indigo-500/30">
-              <p class="font-semibold text-white">Pay from your customer wallet</p>
-              <p class="mt-2 text-sm text-slate-400">
-                Available balance: {{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}. The order total must be covered by your wallet.
-              </p>
-              <a href="{{ url_for('front_bp.account_wallet') }}" class="mt-2 inline-block text-sm text-indigo-300 hover:underline">
-                View refund wallet balance
-              </a>
-            </div>
-            <div id="panel-split" class="hidden p-4 rounded-3xl bg-slate-800 border border-indigo-500/30">
-              <p class="font-semibold text-white">Split payment</p>
-              <p class="mt-2 text-sm text-slate-400">
-                Your available wallet balance will be reserved now. Pay the remaining amount by KHQR to complete the order.
-                If the QR expires, the reserved wallet amount is returned automatically.
-              </p>
-              <p class="mt-2 text-sm text-indigo-300">Available wallet balance: {{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}</p>
+          {% if base64_uri and (order_info.payment in ['qr', 'khqr', 'split'] or (payment_result and payment_result.payment_mode in ['qr', 'khqr', 'split'])) %}
+            <div id="khqr-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+              role="dialog" aria-modal="true" aria-labelledby="khqr-modal-title">
+              <div id="khqr-payment-panel" data-payment-check-url="{{ payment_check_url }}" data-payment-cancel-url="{{ payment_cancel_url }}" data-checkout-url="{{ checkout_url }}"
+                class="w-full max-w-2xl rounded-3xl border border-[#d2d2d7] bg-white p-6 text-center shadow-2xl sm:p-8">
+                <div id="payment-pending-content">
+                  <div class="flex items-center justify-between gap-4">
+                    <h3 id="khqr-modal-title" class="text-left text-lg font-bold text-[#1d1d1f]">Scan to pay with KHQR</h3>
+                    <button id="cancel-khqr-payment" type="button"
+                      class="rounded-xl border border-[#d2d2d7] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-4 py-2 text-xs font-bold text-[#1d1d1f] transition">
+                      Cancel
+                    </button>
+                  </div>
+                  <p class="mb-5 mt-1 text-left text-xs text-[#6e6e73]">
+                    Open your Bakong, ABA, ACLEDA, Wing, or any Cambodian banking app and scan this QR code.
+                  </p>
+
+                  <div class="rounded-2xl bg-[#f5f5f7] border border-[#d2d2d7] p-6">
+                    <img src="{{ base64_uri }}" alt="Bakong KHQR Payment Code" class="mx-auto h-60 w-60 rounded-2xl bg-white object-contain p-4 shadow-sm border border-[#d2d2d7]" />
+                    <div class="mt-5 space-y-1">
+                      <p class="text-xs uppercase tracking-wider text-[#6e6e73] font-bold">Total to pay</p>
+                      <p class="text-3xl font-black text-[#1d1d1f]">{{ khr_format(payment_result.khqr_remaining_khr if payment_result else total_khr) }}</p>
+                      <p class="text-xs font-bold text-[#0071e3]">{{ usd_format(payment_result.khqr_remaining_khr if payment_result else total_khr) }}</p>
+                    </div>
+                    <div class="mt-4 flex items-center justify-center gap-2 text-xs text-[#6e6e73]">
+                      <span id="payment-status-dot" class="h-2 w-2 rounded-full bg-amber-400"></span>
+                      <span id="payment-status-message">Scan with your mobile banking app, then click below to verify.</span>
+                    </div>
+
+                    <!-- Explicit Action Buttons -->
+                    <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <button id="verify-payment-btn" type="button"
+                        class="w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-xs shadow-md shadow-[#0071e3]/20 transition flex items-center justify-center gap-2 cursor-pointer">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span id="verify-btn-text">I Have Paid — Verify Order</span>
+                      </button>
+                      <button id="cancel-payment-modal-btn" type="button"
+                        class="w-full sm:w-auto px-6 py-3.5 rounded-full bg-white hover:bg-[#f5f5f7] text-[#1d1d1f] font-bold text-xs border border-[#d2d2d7] transition cursor-pointer">
+                        Cancel Order
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div id="payment-success-message" class="hidden py-12 text-emerald-700">
+                  <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                  <h3 class="text-2xl font-bold text-[#1d1d1f]">Order placed successfully!</h3>
+                  <p class="mt-2 text-xs text-[#6e6e73]">Payment received and confirmed.</p>
+                </div>
+              </div>
             </div>
           {% endif %}
-        </div>
-      {% endif %}
-    </div>
 
-    <!-- Order Summary -->
-    <div class="bg-slate-800 p-6 rounded-3xl shadow-2xl shadow-slate-950/40 border border-white/10 h-fit">
-      <div class="flex items-start justify-between gap-3 mb-6">
-        <div>
-          <p class="text-sm uppercase tracking-[0.3em] text-indigo-300 font-semibold mb-2">
-            Order preview
-          </p>
-          <h3 class="text-2xl font-bold">Your Order</h3>
-        </div>
-        {% if cart_items %}
-        <span class="text-sm text-slate-400">{{ cart_items|length }} items</span>
+          <!-- Order Snapshot Details -->
+          <div class="p-6 rounded-3xl bg-[#f5f5f7] border border-[#d2d2d7] text-[#1d1d1f] shadow-sm">
+            <h3 class="text-base font-bold text-[#1d1d1f] mb-4">Delivery & Contact Snapshot</h3>
+            <div class="grid sm:grid-cols-2 gap-4 text-xs">
+              <div class="bg-white p-3.5 rounded-xl border border-[#d2d2d7]">
+                <span class="text-[11px] uppercase tracking-wider text-[#6e6e73] font-bold block mb-1">Customer Name</span>
+                <span class="font-bold text-sm text-[#1d1d1f]">{{ order_info.first_name if order_info else '' }} {{ order_info.last_name if order_info else '' }}</span>
+              </div>
+              <div class="bg-white p-3.5 rounded-xl border border-[#d2d2d7]">
+                <span class="text-[11px] uppercase tracking-wider text-[#6e6e73] font-bold block mb-1">Phone</span>
+                <span class="font-bold text-sm text-[#1d1d1f] font-mono">{{ order_info.phone if order_info else '' }}</span>
+              </div>
+              <div class="bg-white p-3.5 rounded-xl border border-[#d2d2d7]">
+                <span class="text-[11px] uppercase tracking-wider text-[#6e6e73] font-bold block mb-1">Email</span>
+                <span class="font-bold text-sm text-[#1d1d1f]">{{ order_info.email if order_info else '' }}</span>
+              </div>
+              <div class="bg-white p-3.5 rounded-xl border border-[#d2d2d7]">
+                <span class="text-[11px] uppercase tracking-wider text-[#6e6e73] font-bold block mb-1">Payment Method</span>
+                <span class="font-bold text-sm text-[#0071e3] uppercase">{{ order_info.payment if order_info else '' }}</span>
+              </div>
+              <div class="sm:col-span-2 bg-white p-3.5 rounded-xl border border-[#d2d2d7]">
+                <span class="text-[11px] uppercase tracking-wider text-[#6e6e73] font-bold block mb-1">Delivery Address</span>
+                <span class="font-bold text-sm text-[#1d1d1f]">{{ order_info.address if order_info else '' }}</span>
+              </div>
+            </div>
+          </div>
+
+        {% else %}
+          <!-- Standard Checkout Form -->
+          <div>
+            <h2 class="text-2xl font-black text-[#1d1d1f] tracking-tight">Billing Details</h2>
+            <p class="text-xs text-[#6e6e73] mt-1">Please enter your shipping address and contact info.</p>
+          </div>
+
+          {% if checkout_error %}
+            <div role="alert" class="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">
+              {{ checkout_error }}
+            </div>
+          {% endif %}
+
+          <div class="space-y-4">
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-[#1d1d1f] uppercase tracking-wider mb-1.5">First Name <span class="text-rose-500">*</span></label>
+                <input type="text" name="first_name" placeholder="First Name" value="{% if customer_defaults is defined and customer_defaults.first_name %}{{ customer_defaults.first_name }}{% elif user is defined and user %}{{ user.username }}{% endif %}" class="w-full p-3.5 bg-white border border-[#d2d2d7] rounded-xl text-xs font-semibold text-[#1d1d1f] placeholder-[#86868b] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition shadow-xs" required />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#1d1d1f] uppercase tracking-wider mb-1.5">Last Name</label>
+                <input type="text" name="last_name" placeholder="Last Name" value="{% if customer_defaults is defined and customer_defaults.last_name %}{{ customer_defaults.last_name }}{% endif %}" class="w-full p-3.5 bg-white border border-[#d2d2d7] rounded-xl text-xs font-semibold text-[#1d1d1f] placeholder-[#86868b] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition shadow-xs" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-[#1d1d1f] uppercase tracking-wider mb-1.5">Delivery Address <span class="text-rose-500">*</span></label>
+              <input type="text" name="address" placeholder="Street, Building, City, Province" value="{% if customer_defaults is defined and customer_defaults.address %}{{ customer_defaults.address }}{% endif %}" class="w-full p-3.5 bg-white border border-[#d2d2d7] rounded-xl text-xs font-semibold text-[#1d1d1f] placeholder-[#86868b] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition shadow-xs" required />
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-[#1d1d1f] uppercase tracking-wider mb-1.5">Phone Number <span class="text-rose-500">*</span></label>
+                <input type="text" name="phone" placeholder="e.g. 012 345 678" value="{% if customer_defaults is defined and customer_defaults.phone %}{{ customer_defaults.phone }}{% endif %}" class="w-full p-3.5 bg-white border border-[#d2d2d7] rounded-xl text-xs font-semibold text-[#1d1d1f] placeholder-[#86868b] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition shadow-xs" required />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#1d1d1f] uppercase tracking-wider mb-1.5">Email Address <span class="text-rose-500">*</span></label>
+                <input type="email" name="email" placeholder="you@domain.com" value="{% if customer_defaults is defined and customer_defaults.email %}{{ customer_defaults.email }}{% elif user is defined and user %}{{ user.email }}{% endif %}" class="w-full p-3.5 bg-white border border-[#d2d2d7] rounded-xl text-xs font-semibold text-[#1d1d1f] placeholder-[#86868b] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] transition shadow-xs" required />
+              </div>
+            </div>
+          </div>
+
+          <h2 class="text-xl font-bold text-[#1d1d1f] mt-8 mb-3">Payment Method</h2>
+
+          <div class="space-y-3">
+            <label class="flex items-center gap-3.5 bg-white p-4 rounded-2xl cursor-pointer border border-[#d2d2d7] hover:border-[#0071e3]/60 transition shadow-xs payment-card">
+              <input type="radio" name="payment" value="cod" id="payment-cod" checked onchange="togglePaymentMethod('cod')" class="accent-[#0071e3] w-4 h-4 cursor-pointer" />
+              <span class="font-bold text-sm text-[#1d1d1f]">Cash on Delivery</span>
+            </label>
+
+            <label class="flex items-center gap-3.5 bg-white p-4 rounded-2xl cursor-pointer border border-[#d2d2d7] hover:border-[#0071e3]/60 transition shadow-xs payment-card">
+              <input type="radio" name="payment" value="qr" id="payment-qr" onchange="togglePaymentMethod('qr')" class="accent-[#0071e3] w-4 h-4 cursor-pointer" />
+              <span class="flex items-center gap-2">
+                <span class="font-bold text-sm text-[#1d1d1f]">QR Payment (Bakong KHQR)</span>
+                <span class="text-[10px] font-bold tracking-wider uppercase bg-[#0071e3]/10 text-[#0071e3] border border-[#0071e3]/20 px-2 py-0.5 rounded-full">Instant</span>
+              </span>
+            </label>
+
+            {% if is_authenticated %}
+              <label class="flex items-center gap-3.5 bg-white p-4 rounded-2xl cursor-pointer border border-[#d2d2d7] hover:border-[#0071e3]/60 transition shadow-xs payment-card">
+                <input type="radio" name="payment" value="wallet" id="payment-wallet" onchange="togglePaymentMethod('wallet')" class="accent-[#0071e3] w-4 h-4 cursor-pointer" />
+                <span class="font-bold text-sm text-[#1d1d1f]">Wallet only — {{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}</span>
+              </label>
+
+              <label class="flex items-center gap-3.5 bg-white p-4 rounded-2xl cursor-pointer border border-[#d2d2d7] hover:border-[#0071e3]/60 transition shadow-xs payment-card">
+                <input type="radio" name="payment" value="split" id="payment-split" onchange="togglePaymentMethod('split')" class="accent-[#0071e3] w-4 h-4 cursor-pointer" />
+                <span class="font-bold text-sm text-[#1d1d1f]">Wallet + KHQR — use available wallet balance first</span>
+              </label>
+            {% endif %}
+          </div>
+
+          <div class="grid gap-4 mt-4">
+            <!-- COD Info Panel -->
+            <div id="panel-cod" class="p-5 rounded-2xl bg-[#f5f5f7] border border-[#d2d2d7]">
+              <p class="font-bold text-sm text-[#1d1d1f]">
+                Pay with cash when your order arrives
+              </p>
+              <p class="text-[#424245] text-xs mt-1.5 leading-relaxed">
+                Choose Cash on Delivery and pay the courier directly. Keep the exact amount ready for a faster delivery.
+              </p>
+            </div>
+
+            <!-- QR Payment Panel -->
+            <div id="panel-qr" class="hidden p-6 rounded-2xl bg-[#f5f5f7] border border-[#0071e3]/30 shadow-sm">
+              <div class="flex items-center justify-between gap-4 mb-4">
+                <div>
+                  <p class="font-bold text-sm text-[#1d1d1f]">Scan to pay with KHQR</p>
+                  <p class="text-[#6e6e73] text-xs mt-1">
+                    {% if base64_uri %}
+                      Open your Bakong, ABA, ACLEDA, Wing, or any Cambodian banking app and scan this QR code.
+                    {% else %}
+                      Place your order to generate a one-time dynamic payment QR code.
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+
+              {% if base64_uri %}
+                <div class="rounded-2xl bg-white p-6 flex flex-col items-center justify-center border border-[#d2d2d7] shadow-sm">
+                  <div class="bg-white p-4 rounded-2xl border border-[#d2d2d7] shadow-xs inline-block">
+                    <img src="{{ base64_uri }}"
+                         alt="Bakong KHQR Payment Code"
+                         class="w-56 h-56 object-contain block" />
+                  </div>
+                  <p class="text-xs uppercase tracking-wider text-[#6e6e73] font-bold mt-5">Total to Pay</p>
+                  <p class="text-2xl font-black text-[#1d1d1f] mt-1">{{ khr_format(total_khr) if khr_format is defined else total_khr }}</p>
+                  <p class="text-xs font-bold text-[#0071e3]">{{ usd_format(total_khr) if usd_format is defined else '' }}</p>
+                  <div class="mt-4 flex items-center gap-2 text-xs text-[#6e6e73]">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                    <span>Scan with Bakong or any Cambodian banking app</span>
+                  </div>
+                </div>
+              {% else %}
+                <div class="rounded-2xl border border-dashed border-[#d2d2d7] bg-white px-6 py-8 text-center">
+                  <p class="font-bold text-xs text-[#1d1d1f]">Your payment QR code will be ready after you place the order.</p>
+                  <p class="mt-1 text-xs text-[#6e6e73]">No payment is requested until the code is generated.</p>
+                </div>
+              {% endif %}
+            </div>
+
+            {% if is_authenticated %}
+              <div id="panel-wallet" class="hidden p-5 rounded-2xl bg-[#f5f5f7] border border-[#0071e3]/30">
+                <p class="font-bold text-sm text-[#1d1d1f]">Pay from your customer wallet</p>
+                <p class="mt-1.5 text-xs text-[#424245]">
+                  Available balance: <b class="text-[#0071e3]">{{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}</b>. The order total must be covered by your wallet.
+                </p>
+                <a href="{{ url_for('front_bp.account_wallet') }}" class="mt-2 inline-block text-xs font-bold text-[#0071e3] hover:underline">
+                  View refund wallet balance &rarr;
+                </a>
+              </div>
+              <div id="panel-split" class="hidden p-5 rounded-2xl bg-[#f5f5f7] border border-[#0071e3]/30">
+                <p class="font-bold text-sm text-[#1d1d1f]">Split payment</p>
+                <p class="mt-1.5 text-xs text-[#424245]">
+                  Your available wallet balance will be reserved now. Pay the remaining amount by KHQR to complete the order.
+                  If the QR expires, the reserved wallet amount is returned automatically.
+                </p>
+                <p class="mt-2 text-xs font-bold text-[#0071e3]">Available wallet balance: {{ khr_format(wallet_balance_khr) if khr_format is defined else wallet_balance_khr }}</p>
+              </div>
+            {% endif %}
+          </div>
         {% endif %}
       </div>
 
-      <div class="space-y-4 mb-6">
-        {% if cart_items %} {% for item in cart_items %}
-        <div class="flex items-center gap-4 p-4 rounded-3xl bg-slate-900 border border-slate-700">
-          <div class="w-20 h-20 rounded-3xl overflow-hidden bg-slate-800 flex items-center justify-center">
-            <img src="{{ item.image }}" alt="{{ item.name }}" class="w-full h-full object-cover" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-white truncate">{{ item.name }}</p>
-            <p class="text-slate-400 text-sm line-clamp-2">
-              {{ item.description }}
+      <!-- Order Summary Column -->
+      <div class="bg-[#f5f5f7] p-6 rounded-3xl shadow-sm border border-[#d2d2d7] h-fit sticky top-24">
+        <div class="flex items-start justify-between gap-3 mb-6">
+          <div>
+            <p class="text-xs uppercase tracking-widest text-[#0071e3] font-bold mb-1">
+              Order Preview
             </p>
-            <div class="mt-3 flex items-center justify-between gap-4 text-sm text-slate-300">
-              <span>Qty: {{ item.qty }}</span>
-              <span>${{ "%.2f"|format(item.price * item.qty) }}</span>
+            <h3 class="text-2xl font-black text-[#1d1d1f] tracking-tight">Your Order</h3>
+          </div>
+          {% if cart_items %}
+          <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white border border-[#d2d2d7] text-[#1d1d1f]">{{ cart_items|length }} items</span>
+          {% endif %}
+        </div>
+
+        <!-- Items list -->
+        <div class="space-y-3 mb-6">
+          {% if cart_items %}
+            {% for item in cart_items %}
+            <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white border border-[#d2d2d7] shadow-xs">
+              <div class="w-16 h-16 rounded-xl overflow-hidden bg-[#f5f5f7] border border-[#d2d2d7] shrink-0 flex items-center justify-center">
+                <img src="{{ item.image }}" alt="{{ item.name }}" class="w-full h-full object-cover" onerror="this.src='/static/images/no-image.jpg'"/>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-xs text-[#1d1d1f] truncate" title="{{ item.name }}">{{ item.name }}</p>
+                <p class="text-[#6e6e73] text-[11px] line-clamp-1 mt-0.5">
+                  {{ item.description }}
+                </p>
+                <div class="mt-2 flex items-center justify-between text-xs">
+                  <span class="font-semibold text-[#424245]">Qty: <b class="text-[#1d1d1f]">{{ item.qty }}</b></span>
+                  <span class="font-bold text-[#0071e3]">${{ "%.2f"|format(item.price * item.qty) }}</span>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-[#6e6e73] text-xs p-4 bg-white rounded-2xl border border-[#d2d2d7] text-center">Your cart is empty.</div>
+          {% endif %}
+        </div>
+
+        <!-- Coupon Box Partial -->
+        {% if not order_placed %}
+        <div class="mb-4">
+          {% include 'front/partials/_coupon_box.html' ignore missing %}
+        </div>
+        {% endif %}
+
+        <!-- Pricing Breakdown -->
+        <input type="hidden" id="checkout_subtotal_cents" value="{{ subtotal_cents if subtotal_cents is defined else (subtotal * 100)|int if subtotal is defined else 0 }}"/>
+        <div id="pricing_breakdown_container" class="space-y-2.5 mb-6 bg-white p-4 rounded-2xl border border-[#d2d2d7] shadow-xs">
+          <div class="flex justify-between items-center text-xs text-[#6e6e73] font-medium">
+            <span>Subtotal</span>
+            <span id="checkout_subtotal_display" class="font-bold text-[#1d1d1f] text-sm">${{ "%.2f"|format(subtotal if subtotal is defined else 0) }}</span>
+          </div>
+          {% if discount_cents is defined and discount_cents > 0 %}
+          <div id="checkout_discount_row" class="flex justify-between items-center text-xs text-emerald-600 font-bold">
+            <span>Coupon Discount ({{ coupon_code }})</span>
+            <span id="discount_amount_display" class="font-bold text-sm text-emerald-600">-${{ "%.2f"|format(discount if discount is defined else (discount_cents / 100)) }}</span>
+          </div>
+          {% elif order is defined and order.discount_cents and order.discount_cents > 0 %}
+          <div id="checkout_discount_row" class="flex justify-between items-center text-xs text-emerald-600 font-bold">
+            <span>Coupon Discount ({{ order.coupon_code }})</span>
+            <span id="discount_amount_display" class="font-bold text-sm text-emerald-600">-${{ "%.2f"|format(order.discount_cents / 100) }}</span>
+          </div>
+          {% endif %}
+          <div class="flex justify-between items-center text-xs text-[#6e6e73] font-medium">
+            <span>Shipping</span>
+            <span class="font-bold text-emerald-600 text-xs">{{ "Free" if shipping == 0 else "$%.2f"|format(shipping) }}</span>
+          </div>
+          <div class="flex justify-between items-baseline border-t border-[#d2d2d7] pt-3 mt-1">
+            <span class="text-sm font-extrabold text-[#1d1d1f]">Total</span>
+            <div class="text-right">
+              <span id="checkout_total_display" class="text-2xl font-black text-[#1d1d1f]">${{ "%.2f"|format(total if total is defined else 0) }}</span>
+              {% if total_khr is defined and khr_format is defined %}
+                <span class="block text-xs font-bold text-[#0071e3] mt-0.5">≈ {{ khr_format(total_khr) }}</span>
+              {% endif %}
             </div>
           </div>
         </div>
-        {% endfor %} {% else %}
-        <div class="text-slate-400">Your cart is empty.</div>
+
+        <!-- Action Button -->
+        {% if not order_placed %}
+          <button type="submit"
+            class="w-full py-3.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-sm transition shadow-md shadow-[#0071e3]/20 hover:shadow-lg active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Place Order</span>
+          </button>
+        {% else %}
+          <a href="{{ url_for('front_bp.home') }}"
+            class="block w-full text-center bg-white hover:bg-[#f5f5f7] text-[#1d1d1f] border border-[#d2d2d7] py-3.5 rounded-full font-bold text-xs transition shadow-sm">
+            Return to Storefront
+          </a>
         {% endif %}
       </div>
-
-      <!-- Coupon Box Partial -->
-      {% if not order_placed %}
-      <div class="mb-6">
-        {% include 'front/partials/_coupon_box.html' ignore missing %}
-      </div>
-      {% endif %}
-
-      <div class="space-y-4 mb-6">
-        <div class="flex justify-between text-slate-400">
-          <span>Subtotal</span>
-          <span>${{ "%.2f"|format(subtotal if subtotal is defined else 0) }}</span>
-        </div>
-        {% if discount_cents is defined and discount_cents > 0 %}
-        <div class="flex justify-between text-emerald-400 font-medium text-sm">
-          <span>Coupon Discount ({{ coupon_code }})</span>
-          <span>-${{ "%.2f"|format(discount if discount is defined else (discount_cents / 100)) }}</span>
-        </div>
-        {% elif order is defined and order.discount_cents and order.discount_cents > 0 %}
-        <div class="flex justify-between text-emerald-400 font-medium text-sm">
-          <span>Coupon Discount ({{ order.coupon_code }})</span>
-          <span>-${{ "%.2f"|format(order.discount_cents / 100) }}</span>
-        </div>
-        {% endif %}
-        <div class="flex justify-between text-slate-400">
-          <span>Shipping</span>
-          <span>{{ "Free" if shipping == 0 else "$%.2f"|format(shipping) }}</span>
-        </div>
-        <div class="flex justify-between font-semibold text-xl text-white border-t border-white/10 pt-4">
-          <span>Total</span>
-          <div class="text-right">
-            <span>${{ "%.2f"|format(total if total is defined else 0) }}</span>
-            {% if total_khr is defined and khr_format is defined %}
-              <span class="block text-xs font-normal text-indigo-400">≈ {{ khr_format(total_khr) }}</span>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      {% if not order_placed %}
-        <button type="submit"
-          class="w-full bg-gradient-to-r from-indigo-500 to-cyan-500 py-3 rounded-3xl font-semibold text-slate-950 transition hover:brightness-110 shadow-lg shadow-indigo-500/20">
-          Place Order
-        </button>
-      {% else %}
-        <a href="{{ url_for('front_bp.home') }}"
-          class="block w-full text-center bg-slate-700 hover:bg-slate-600 py-3 rounded-3xl font-semibold text-white transition">
-          Return to Storefront
-        </a>
-      {% endif %}
-    </div>
-  </form>
+    </form>
+  </main>
 
   <!-- Footer -->
   {% include 'front/share/footer.html' %}
@@ -362,8 +395,13 @@
         if (radio) {
           const label = radio.closest('label');
           if (label) {
-            label.classList.toggle('border-indigo-500/60', name === method);
-            label.classList.toggle('border-transparent', name !== method);
+            if (name === method) {
+              label.classList.add('border-[#0071e3]', 'bg-[#0071e3]/5');
+              label.classList.remove('border-[#d2d2d7]', 'bg-white');
+            } else {
+              label.classList.remove('border-[#0071e3]', 'bg-[#0071e3]/5');
+              label.classList.add('border-[#d2d2d7]', 'bg-white');
+            }
           }
         }
       });
@@ -491,13 +529,13 @@
             if (pendingContent) pendingContent.classList.add('hidden');
             if (successMessage) successMessage.classList.remove('hidden');
             if (banner) {
-              banner.classList.replace('bg-amber-500/10', 'bg-emerald-500/10');
-              banner.classList.replace('border-amber-500/20', 'border-emerald-500/20');
-              banner.classList.replace('text-amber-200', 'text-emerald-200');
+              banner.classList.replace('bg-amber-50', 'bg-emerald-50');
+              banner.classList.replace('border-amber-300', 'border-emerald-300');
+              banner.classList.replace('text-amber-900', 'text-emerald-900');
             }
             if (icon) {
-              icon.classList.replace('bg-amber-500/20', 'bg-emerald-500/20');
-              icon.classList.replace('text-amber-400', 'text-emerald-400');
+              icon.classList.replace('bg-amber-500/15', 'bg-emerald-500/15');
+              icon.classList.replace('text-amber-600', 'text-emerald-600');
               icon.classList.replace('border-amber-500/30', 'border-emerald-500/30');
             }
             if (title) title.textContent = 'Order placed successfully!';

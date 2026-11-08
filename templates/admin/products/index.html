@@ -173,8 +173,10 @@
       class="border border-border bg-paper rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet"
     >
       <option value="">All Statuses</option>
-      <option value="active">Active Only</option>
-      <option value="inactive">Inactive Only</option>
+      <option value="active">Active (Healthy)</option>
+      <option value="low-stock">Low Stock</option>
+      <option value="out-of-stock">Out of Stock</option>
+      <option value="inactive">Inactive</option>
     </select>
 
     <button
@@ -212,6 +214,23 @@
       <tbody class="divide-y divide-border" id="adminProductsTableBody">
         {% if products %}
           {% for product in products %}
+            {% set total_stock = product.stock if product.stock is defined else 0 %}
+            {% set has_low = false %}
+            {% for v in product.variants %}
+              {% set thresh = v.low_stock_threshold if v.low_stock_threshold is not none else 5 %}
+              {% if v.stock <= thresh %}
+                {% set has_low = true %}
+              {% endif %}
+            {% endfor %}
+            {% if not product.is_active %}
+              {% set row_status = 'inactive' %}
+            {% elif has_low and total_stock > 0 %}
+              {% set row_status = 'low-stock' %}
+            {% elif total_stock <= 0 %}
+              {% set row_status = 'out-of-stock' %}
+            {% else %}
+              {% set row_status = 'active' %}
+            {% endif %}
             <tr
               class="admin-product-row hover:bg-paper/50 transition"
               data-id="{{ product.id }}"
@@ -222,7 +241,7 @@
               data-brand-id="{{ product.brand_id or '' }}"
               data-brand-name="{{ product.brand.name if product.brand else '' }}"
               data-skus="{% for v in product.variants %}{{ v.sku }} {{ v.spec_name }} {% endfor %}"
-              data-status="{{ 'active' if product.is_active else 'inactive' }}"
+              data-status="{{ row_status }}"
             >
               <!-- Image & Name -->
               <td class="py-3 px-4">
@@ -287,18 +306,9 @@
 
               <!-- Total Stock & Low Stock Badge -->
               <td class="py-3 px-4">
-                {% set total_stock = product.stock if product.stock is defined else 0 %}
-                {% set has_low = false %}
-                {% for v in product.variants %}
-                  {% set thresh = v.low_stock_threshold if v.low_stock_threshold is not none else 5 %}
-                  {% if v.stock <= thresh %}
-                    {% set has_low = true %}
-                  {% endif %}
-                {% endfor %}
-
                 <div class="flex items-center gap-2">
                   <span class="font-mono font-bold text-sm">{{ total_stock }}</span>
-                  {% if has_low %}
+                  {% if has_low and total_stock > 0 %}
                     <span class="bg-amber-500/15 text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1">
                       <i class="bi bi-exclamation-triangle-fill"></i> Low Stock
                     </span>
@@ -320,9 +330,18 @@
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button
                     type="submit"
-                    class="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition {% if product.is_active %}bg-green-500/15 text-green-500 border-green-500/30 hover:bg-green-500/25{% else %}bg-paper text-text-muted border-border hover:bg-border{% endif %}"
+                    class="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition inline-flex items-center gap-1.5 {% if not product.is_active %}bg-paper text-text-muted border-border hover:bg-border{% elif has_low and total_stock > 0 %}bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25{% elif total_stock <= 0 %}bg-rose-500/15 text-rose-500 border-rose-500/30 hover:bg-rose-500/25{% else %}bg-green-500/15 text-green-500 border-green-500/30 hover:bg-green-500/25{% endif %}"
+                    title="Click to toggle Active/Inactive"
                   >
-                    {{ 'Active' if product.is_active else 'Inactive' }}
+                    {% if not product.is_active %}
+                      <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Inactive
+                    {% elif has_low and total_stock > 0 %}
+                      <i class="bi bi-exclamation-triangle-fill text-[10px]"></i> Low Stock
+                    {% elif total_stock <= 0 %}
+                      <i class="bi bi-x-circle-fill text-[10px]"></i> Out of Stock
+                    {% else %}
+                      <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Active
+                    {% endif %}
                   </button>
                 </form>
               </td>

@@ -197,8 +197,8 @@
 <!-- ============================================================================== -->
 <!-- LUXURY ORDER DETAIL MODAL                                                     -->
 <!-- ============================================================================== -->
-<div id="orderDetailModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="relative w-full max-w-3xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+<div id="orderDetailModal" class="fixed inset-0 z-[99999] hidden overflow-y-auto bg-black/75 backdrop-blur-sm p-4 sm:p-6" style="display: none; align-items: center; justify-content: center;">
+  <div class="relative w-full max-w-3xl my-auto mx-auto bg-card border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
     
     <!-- Modal Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-border bg-paper">
@@ -335,7 +335,11 @@
 
   async function openOrderModal(orderId) {
     const modal = document.getElementById('orderDetailModal');
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
     modal.classList.remove('hidden');
+    modal.style.display = 'flex';
 
     try {
       const response = await fetch(`/admin/orders/${orderId}?format=json`, {
@@ -483,7 +487,11 @@
   }
 
   function closeOrderModal() {
-    document.getElementById('orderDetailModal').classList.add('hidden');
+    const modal = document.getElementById('orderDetailModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
     currentModalOrder = null;
   }
 

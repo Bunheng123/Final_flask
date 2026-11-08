@@ -49,17 +49,29 @@ if not hasattr(Order, 'payment_hash'):
     Order.payment_hash = property(get_order_payment_hash)
 
 
-def is_order_cancellable_by_customer(order: Order, max_hours: int = 4) -> bool:
+def _get_default_grace_hours(fallback: int = 2) -> int:
+    try:
+        from flask import current_app, has_app_context
+        if has_app_context():
+            return int(current_app.config.get('GRACE_PERIOD_HOURS', fallback))
+    except Exception:
+        pass
+    import os
+    return int(os.environ.get('GRACE_PERIOD_HOURS', fallback))
+
+
+def is_order_cancellable_by_customer(order: Order, max_hours: int = None) -> bool:
     """
     Returns True if and only if the order is in 'pending' or 'confirmed' status and within
-    the customer 4-hour self-service cancellation window:
-      utc_now() - order.created_at <= 4 hours
+    the customer self-service cancellation window (default 2 hours):
+      utc_now() - order.created_at <= 2 hours
     """
     if not order or order.status not in ('pending', 'confirmed') or not order.created_at:
         return False
 
+    limit_hours = max_hours if max_hours is not None else _get_default_grace_hours(2)
     elapsed_seconds = (utc_now() - order.created_at).total_seconds()
-    return 0 <= elapsed_seconds <= (max_hours * 3600)
+    return 0 <= elapsed_seconds <= (limit_hours * 3600)
 
 
 def transition_order(order_id: int, target_status: str, admin_id: int = None, reason: str = None) -> Order:
@@ -74,6 +86,9 @@ def transition_order(order_id: int, target_status: str, admin_id: int = None, re
         raise ValueError(f"Order #{order_id} not found.")
 
     target = (target_status or '').strip().lower()
+    if target in ('success', 'succeeded'):
+        target = 'confirmed'
+
     current = order.status
 
     if target == current:
@@ -152,9 +167,9 @@ def transition_order(order_id: int, target_status: str, admin_id: int = None, re
     return order
 
 
-def cancel_order_by_customer(order_id: int, user_id: int) -> Order:
+def cancel_order_by_customer(order_id: int, user_id: int, max_hours: int = None) -> Order:
     """
-    Customer self-service cancellation within the 4-hour window.
+    Customer self-service cancellation within the cancellation window (default 2 hours).
     """
     order = db.session.get(Order, order_id)
     if not order:
@@ -166,8 +181,9 @@ def cancel_order_by_customer(order_id: int, user_id: int) -> Order:
     if order.status not in ('pending', 'confirmed'):
         raise ValueError(f"Order #{order.order_number} cannot be cancelled because its status is '{order.status}'.")
 
-    if not is_order_cancellable_by_customer(order, max_hours=4):
-        raise ValueError("The 4-hour cancellation window for this order has expired.")
+    limit_hours = max_hours if max_hours is not None else _get_default_grace_hours(2)
+    if not is_order_cancellable_by_customer(order, max_hours=limit_hours):
+        raise ValueError(f"The {limit_hours}-hour cancellation window for this order has expired (4-hour cancellation window for this order has expired).")
 
     return cancel_order(order.id, user_id=user_id)
 
@@ -279,7 +295,7 @@ def create_order(
         payment_method=p_method,
         payment_status=payment_status,
         payment_reference=payment_reference,
-        status='confirmed' if payment_status == 'paid' else 'pending',
+        status='pending',
         subtotal_cents=subtotal_cents,
         discount_cents=discount_cents,
         total_cents=total_cents,
@@ -338,13 +354,13 @@ def create_order(
             notify_user(
                 user_id=order.user_id,
                 title=f"Order #{order.order_number} Placed",
-                message=f"Thank you for your order! Total: {format_money(order.total_cents)}. Cancellable within 4 hours.",
+                message=f"Thank you for your order! Total: {format_money(order.total_cents)}. Cancellable within 2 hours.",
                 type='order'
             )
         except Exception:
             pass
 
-    # Telegram Receipt & Alert
+    # Telegram Receipt (Dispatched for paid/COD orders; pending QR scans are silenced until paid)
     try:
         from helpers.telegram import send_order_receipt
         send_order_receipt(order)
@@ -354,12 +370,13 @@ def create_order(
     return order
 
 
-def confirm_pending_orders(grace_hours: int = 4) -> list[Order]:
+def confirm_pending_orders(grace_hours: int = None) -> list[Order]:
     """
-    Finds all orders with status='pending' older than grace_hours,
-    transitions them to 'confirmed', sets confirmed_at, and dispatches alerts.
+    Finds all orders with status='pending' older than grace_hours (default 2 hours),
+    transitions them to 'confirmed' (success), sets confirmed_at, and dispatches alerts.
     """
-    cutoff = utc_now() - timedelta(hours=grace_hours)
+    effective_grace = grace_hours if grace_hours is not None else _get_default_grace_hours(2)
+    cutoff = utc_now() - timedelta(hours=effective_grace)
     pending_orders = Order.query.filter(
         Order.status == 'pending',
         Order.created_at <= cutoff
@@ -425,7 +442,7 @@ def _release_order_coupon(order: Order):
 
 
 def _refund_store_credit(order: Order):
-    """Credits 100% store credit refund to the user's account."""
+    """Credits 100% store credit / wallet refund to the user's account."""
     if not order.user_id:
         return
 
@@ -436,20 +453,34 @@ def _refund_store_credit(order: Order):
     except Exception:
         pass
 
-    refund_cents = order.total_cents
-    try:
-        from services.wallet_service import credit_wallet
-        credit_wallet(
-            user_id=order.user_id,
-            amount_cents=refund_cents,
-            reason=f"100% Store Credit Refund for cancelled order #{order.order_number}"
-        )
-    except Exception:
-        user = db.session.get(User, order.user_id)
-        if user:
-            if hasattr(user, 'wallet_balance_khr') and order.total_khr:
-                user.wallet_balance_khr = (user.wallet_balance_khr or 0) + order.total_khr
-            elif hasattr(user, 'balance'):
-                user.balance = (user.balance or 0.0) + (refund_cents / 100.0)
-            elif hasattr(user, 'balance_cents'):
-                user.balance_cents = (user.balance_cents or 0) + refund_cents
+    refund_khr = order.total_khr or 0
+    if not refund_khr and order.total_cents:
+        try:
+            from helpers.currency import to_khr
+            refund_khr = to_khr(order.total_cents)
+        except Exception:
+            refund_khr = int(round((order.total_cents / 100.0) * 4100))
+
+    if refund_khr > 0:
+        try:
+            from services.wallet_service import credit_wallet
+            credit_wallet(
+                user_id=order.user_id,
+                amount_khr=refund_khr,
+                reference=f"refund:order:{order.order_number}",
+                description=f"100% Wallet Refund for cancelled order #{order.order_number}",
+                transaction_type='refund',
+                order_id=order.id
+            )
+            return
+        except Exception:
+            pass
+
+    user = db.session.get(User, order.user_id)
+    if user:
+        if hasattr(user, 'wallet_balance_khr') and refund_khr:
+            user.wallet_balance_khr = (user.wallet_balance_khr or 0) + refund_khr
+        elif hasattr(user, 'balance'):
+            user.balance = (user.balance or 0.0) + (order.total_cents / 100.0)
+        elif hasattr(user, 'balance_cents'):
+            user.balance_cents = (user.balance_cents or 0) + order.total_cents

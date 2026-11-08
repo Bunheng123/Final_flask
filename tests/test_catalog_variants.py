@@ -343,6 +343,10 @@ def test_low_stock_alert_triggered_fallback_threshold(app, sample_catalog, monke
         assert "Threshold Trigger: <b>5</b>" in msg
         assert f"/admin/products/{prod2.id}/variants" in msg
 
+        # Subsequent purchase on already-low product -> Stock: 3 -> No redundant alert!
+        stock_service.decrement_stock_atomic(variant_id=var.id, quantity=1)
+        assert len(dispatched_alerts) == 1
+
 
 def test_low_stock_alert_uses_custom_security_alert_channel(app, sample_catalog, monkeypatch):
     """

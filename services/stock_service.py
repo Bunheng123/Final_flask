@@ -116,7 +116,8 @@ def _get_alert_telegram_credentials():
 def _notify_low_stock(variant: ProductVariant, threshold: int) -> None:
     """
     Dispatch a low-stock alert asynchronously via Telegram to the 429 security alert chat.
-    Includes formatted warning card: Product Name, Spec, SKU, Remaining Stock, Threshold, Restock Link.
+    Includes formatted warning card: Product Name, Spec, SKU, Remaining Stock, Threshold,
+    and a summary of all active items that are currently low in stock.
     Never raises an exception into the caller.
     """
     try:
@@ -127,6 +128,18 @@ def _notify_low_stock(variant: ProductVariant, threshold: int) -> None:
         remaining_stock = variant.stock if variant else 0
         restock_link = f"/admin/products/{product_id}/variants" if product_id else "/admin/products"
 
+        # List all active products that are currently low in stock
+        all_low = get_low_stock_variants()
+        low_items_block = ""
+        if all_low:
+            low_lines = []
+            for lv in all_low:
+                pname = lv.product.name if lv.product else "Product"
+                sname = f" ({lv.spec_name})" if lv.spec_name else ""
+                t = lv.low_stock_threshold if lv.low_stock_threshold is not None else threshold
+                low_lines.append(f"• <b>{_escape_html(pname)}{_escape_html(sname)}</b> — Stock: <b>{lv.stock}</b> (Thresh: {t})")
+            low_items_block = f"\n━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>All Low-Stock Items ({len(all_low)}):</b>\n" + "\n".join(low_lines[:10])
+
         msg = (
             "⚠️ <b>[LOW STOCK ALERT]</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -134,7 +147,8 @@ def _notify_low_stock(variant: ProductVariant, threshold: int) -> None:
             f"Spec: <b>{_escape_html(spec_name)}</b>\n"
             f"SKU: <code>{_escape_html(sku)}</code>\n"
             f"Remaining Stock: <b>{remaining_stock}</b>\n"
-            f"Threshold Trigger: <b>{threshold}</b>\n"
+            f"Threshold Trigger: <b>{threshold}</b>"
+            f"{low_items_block}\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🔗 Restock Link: <code>{restock_link}</code>"
         )
@@ -622,6 +636,7 @@ def update_stock(variant_id: int, new_stock: int) -> bool:
     if not variant:
         return False
 
+    previous_stock = variant.stock
     variant.stock = int(new_stock)
     db.session.commit()
     db.session.expire_all()
@@ -631,7 +646,8 @@ def update_stock(variant_id: int, new_stock: int) -> bool:
         if variant.low_stock_threshold is not None
         else _get_fallback_low_stock_threshold()
     )
-    if variant.stock <= thresh:
+    # Alert only when stock instantly crossed into low stock (was > thresh, now <= thresh)
+    if previous_stock > thresh and variant.stock <= thresh:
         _notify_low_stock(variant, thresh)
 
     return True
@@ -707,7 +723,9 @@ def decrement_stock_atomic(variant_id: int, quantity: int) -> bool:
             if variant.low_stock_threshold is not None
             else _get_fallback_low_stock_threshold()
         )
-        if variant.stock <= thresh:
+        previous_stock = variant.stock + quantity
+        # Alert ONLY when stock instantly crossed into low stock (was > thresh, now <= thresh)
+        if previous_stock > thresh and variant.stock <= thresh:
             _notify_low_stock(variant, thresh)
 
     return True

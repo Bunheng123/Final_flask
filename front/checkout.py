@@ -3,6 +3,7 @@ import json
 
 from flask import (
     current_app,
+    flash,
     make_response,
     render_template,
     request,
@@ -211,6 +212,8 @@ def do_checkout():
         return _render_checkout(cart_before, 'We could not place your order. Please try again.'), 500
 
     base64_uri = khqr_payment.get('base64_uri') if khqr_payment else None
+    if not base64_uri:
+        flash(f"Order #{order.order_number} received! You have 2 hours to cancel for an instant refund.", "success")
     response = make_response(render_template(
         'front/checkout.html',
         order_placed=True,

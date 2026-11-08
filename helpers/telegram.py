@@ -77,14 +77,16 @@ def send_order_receipt(order):
     """
     Builds and dispatches a comprehensive, luxury HTML order receipt to Telegram.
     Includes customer snapshot, payment method, itemized line items table, and totals.
-    Dispatched ONLY if order is confirmed and paid.
+    Dispatched for all placed orders (COD, Wallet, KHQR, etc.).
     """
     if not order:
         return
 
-    # Never alert Telegram for unpaid or pending orders
-    payment_status = getattr(order, 'payment_status', None)
-    if payment_status != 'paid':
+    payment_status = getattr(order, 'payment_status', 'unpaid') or 'unpaid'
+    payment_method = (getattr(order, 'payment_method', 'COD') or 'COD').lower()
+
+    # Do not alert Telegram for pending QR scans that are not paid yet
+    if payment_status == 'pending' or (payment_method in ('qr', 'khqr') and payment_status != 'paid'):
         return
 
     from helpers.money import format_money
@@ -111,16 +113,30 @@ def send_order_receipt(order):
     if wallet_used > 0:
         wallet_line = f"👛 <b>Wallet Used:</b> {khr_format(wallet_used)}\n"
 
-    payment_method = getattr(order, 'payment_method', 'KHQR') or 'KHQR'
+    if payment_status == 'paid':
+        payment_badge = f"<code>{_escape_html(payment_method.upper())}</code> (PAID)"
+        status_badge = "PAID & CONFIRMED"
+        header_tag = "PAID ORDER RECEIPT"
+        icon = "✅"
+    elif payment_method.lower() == 'cod':
+        payment_badge = "<code>CASH ON DELIVERY</code> (Pay upon arrival)"
+        status_badge = "PENDING DISPATCH (COD)"
+        header_tag = "NEW COD ORDER"
+        icon = "🛒"
+    else:
+        payment_badge = f"<code>{_escape_html(payment_method.upper())}</code> ({_escape_html(payment_status.upper())})"
+        status_badge = _escape_html(getattr(order, 'status', 'PENDING').upper())
+        header_tag = "NEW ORDER"
+        icon = "📦"
 
     receipt = (
-        f"✅ <b>[PAID ORDER RECEIPT #{_escape_html(order.order_number)}]</b>\n"
+        f"{icon} <b>[{header_tag} #{_escape_html(order.order_number)}]</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Customer:</b> {_escape_html(order.customer_name)}\n"
         f"📞 <b>Phone:</b> {_escape_html(order.phone)}\n"
         f"✉️ <b>Email:</b> {_escape_html(order.email)}\n"
         f"📍 <b>Address:</b> {_escape_html(order.address)}\n"
-        f"💳 <b>Payment:</b> <code>{_escape_html(payment_method.upper())}</code> (PAID)\n"
+        f"💳 <b>Payment:</b> {payment_badge}\n"
         f"{wallet_line}"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🛒 <b>Ordered Items:</b>\n{items_text}"
@@ -128,9 +144,9 @@ def send_order_receipt(order):
         f"💵 <b>Subtotal:</b> {format_money(order.subtotal_cents)}\n"
         f"{discount_line}"
         f"🚚 <b>Shipping:</b> Free\n"
-        f"💰 <b>Total Paid:</b> <b>{format_money(order.total_cents)}</b> ({khr_amount})\n"
+        f"💰 <b>Total:</b> <b>{format_money(order.total_cents)}</b> ({khr_amount})\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📌 <b>Status:</b> <b>PAID & CONFIRMED</b>"
+        f"📌 <b>Status:</b> <b>{status_badge}</b>"
     )
 
     send_telegram(receipt)
@@ -154,11 +170,35 @@ def send_order_alert(order_number: str, total_str: str, customer_name: str, stat
     """
     Wrapper stub for order status / lifecycle transition alerts.
     """
+    status_clean = (status or '').strip().lower()
+    if status_clean == 'cancelled':
+        emoji = "❌"
+        title = "ORDER CANCELLED & REFUNDED"
+        desc = "Order was cancelled within grace period. Inventory restored and paid funds credited to wallet."
+    elif status_clean in ('confirmed', 'paid'):
+        emoji = "✅"
+        title = "ORDER CONFIRMED"
+        desc = "Order payment verified and order approved for fulfillment."
+    elif status_clean == 'shipped':
+        emoji = "🚚"
+        title = "ORDER SHIPPED"
+        desc = "Order dispatched and on the way to customer."
+    elif status_clean == 'delivered':
+        emoji = "📦"
+        title = "ORDER DELIVERED"
+        desc = "Order safely delivered to customer."
+    else:
+        emoji = "🛒"
+        title = f"ORDER {status_clean.upper()}"
+        desc = "Order placed and registered in store database."
+
     msg = (
-        f"📦 <b>[ORDER UPDATE #{_escape_html(order_number)}]</b>\n"
-        f"Customer: <b>{_escape_html(customer_name)}</b>\n"
-        f"Total: <b>{_escape_html(total_str)}</b>\n"
-        f"Status: <b>{_escape_html(status.upper())}</b>"
+        f"{emoji} <b>[{title} #{_escape_html(order_number)}]</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Customer:</b> {_escape_html(customer_name)}\n"
+        f"💰 <b>Total Amount:</b> <b>{_escape_html(total_str)}</b>\n"
+        f"📌 <b>Status:</b> <b>{_escape_html(status.upper())}</b>\n"
+        f"ℹ️ {desc}"
     )
     send_telegram(msg)
 

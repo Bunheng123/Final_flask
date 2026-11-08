@@ -195,6 +195,19 @@ def account_orders():
 
     orders = query.order_by(Order.created_at.desc()).all()
 
+    # Precalculate cancellation eligibility & remaining grace seconds for countdown
+    now_utc = utc_now()
+    for o in orders:
+        cancellable = False
+        remaining_secs = 0
+        if o.status in ('pending', 'confirmed') and o.created_at:
+            elapsed = (now_utc - o.created_at).total_seconds()
+            if 0 <= elapsed <= 7200:
+                cancellable = True
+                remaining_secs = max(0, int(7200 - elapsed))
+        setattr(o, 'is_cancellable', cancellable)
+        setattr(o, 'remaining_seconds', remaining_secs)
+
     # User statistics for overview metric cards
     all_user_orders = Order.query.filter_by(user_id=user.id).all()
     total_spent_cents = sum((o.total_cents or 0) for o in all_user_orders if o.status != 'cancelled')
@@ -254,7 +267,7 @@ def account_order_detail(order_number: str):
     grace_seconds = 4 * 3600
     if order.created_at:
         time_since_creation = (utc_now() - order.created_at).total_seconds()
-        can_cancel = (order.status == 'pending') and (time_since_creation <= grace_seconds)
+        can_cancel = (order.status in ('pending', 'confirmed')) and (time_since_creation <= grace_seconds)
         time_remaining_seconds = max(0, int(grace_seconds - time_since_creation)) if can_cancel else 0
     else:
         can_cancel = False
@@ -336,6 +349,10 @@ def account_order_cancel(order_number: str = None, order_id: int = None):
         current_app.logger.exception("Unable to cancel customer order %s.", target)
         abort(500)
 
+    # Return to order history if request was submitted from order history page
+    ref = request.referrer or ''
+    if 'orders' in ref and order.order_number not in ref:
+        return redirect(url_for('front_bp.account_orders'))
     return redirect(url_for('front_bp.account_order_detail', order_number=order.order_number))
 
 

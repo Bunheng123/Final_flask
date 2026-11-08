@@ -2,8 +2,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TechStore</title>
 
+<!-- Fonts & Bootstrap Icons -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+  href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"
+  rel="stylesheet"
+/>
+
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: [
+            '-apple-system',
+            'BlinkMacSystemFont',
+            '"SF Pro Text"',
+            '"SF Pro Display"',
+            '"Helvetica Neue"',
+            'Arial',
+            'sans-serif'
+          ],
+        },
+        colors: {
+          apple: {
+            blue: '#0071e3',
+            'blue-hover': '#0077ed',
+            link: '#0066cc',
+            'link-dark': '#2997ff',
+            gray: '#f5f5f7',
+            soft: '#fbfbfd',
+            dark: '#1d1d1f',
+            black: '#000000',
+            border: '#d2d2d7',
+            secondary: '#6e6e73',
+            muted: '#86868b',
+          },
+          // Map default indigo and blue accents to Apple Action Blue
+          indigo: {
+            400: '#2997ff',
+            500: '#0071e3',
+            600: '#0071e3',
+            700: '#0066cc',
+          },
+          violet: '#0071e3',
+        }
+      }
+    }
+  }
+</script>
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='style/customer.css') }}"
+  href="{{ url_for('static', filename='style/customer.css') }}?v=3.2"
 />
