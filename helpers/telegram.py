@@ -27,6 +27,14 @@ def _get_active_credentials(token=None, chat_id=None):
     """
     try:
         from dotenv import load_dotenv
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        for env_path in (
+            os.path.join(project_root, '.env'),
+            os.path.join(os.path.dirname(project_root), '.env'),
+            os.path.expanduser('~/.env')
+        ):
+            if os.path.exists(env_path):
+                load_dotenv(env_path, override=False)
         load_dotenv(override=False)
     except Exception:
         pass
@@ -53,6 +61,20 @@ def _send_telegram_worker(text, chat_id, token, parse_mode):
     try:
         res = requests.post(url, json=payload, headers=headers, timeout=10)
         if not res.ok:
+            try:
+                data = res.json()
+            except Exception:
+                data = {}
+            new_chat_id = (data.get('parameters') or {}).get('migrate_to_chat_id')
+            if new_chat_id:
+                print(f"[Telegram Notice] Chat migrated to supergroup {new_chat_id}. Retrying delivery...")
+                os.environ["TELEGRAM_CHAT_ID"] = str(new_chat_id)
+                os.environ["TELEGRAM_ALERT_CHAT_ID"] = str(new_chat_id)
+                payload['chat_id'] = new_chat_id
+                retry_res = requests.post(url, json=payload, headers=headers, timeout=10)
+                if retry_res.ok:
+                    print(f"[Telegram Bot Success] Message delivered to {new_chat_id}")
+                    return
             print(f"[Telegram Bot Error] HTTP {res.status_code}: {res.text}")
         else:
             print(f"[Telegram Bot Success] Message delivered to {target_chat}")
