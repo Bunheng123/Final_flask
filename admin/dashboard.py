@@ -45,8 +45,8 @@ def dashboard():
     total_inventory_units = sum((v.stock or 0) for v in active_variants)
     low_stock_variants = get_low_stock_variants()
     low_stock_count = len(low_stock_variants)
-    out_of_stock_count = sum(1 for v in low_stock_variants if v.stock <= 0)
-    critical_low_count = sum(1 for v in low_stock_variants if v.stock > 0)
+    out_of_stock_count = sum(1 for v in low_stock_variants if (v.stock or 0) <= 0)
+    critical_low_count = sum(1 for v in low_stock_variants if (v.stock or 0) > 0)
     healthy_skus_count = max(0, variants_count - low_stock_count)
     inventory_health_percent = round((healthy_skus_count / variants_count * 100), 1) if variants_count > 0 else 100.0
     active_coupons_count = Coupon.query.filter_by(is_active=True).count()
