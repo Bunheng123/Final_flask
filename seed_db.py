@@ -50,6 +50,26 @@ def seed_database(test_price_cents: Optional[int] = None):
     except Exception as e:
         print(f"  Note on migrations: {e}")
 
+    # Ensure missing columns in existing tables are added if migrations were incomplete
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        if 'products' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('products')]
+            if 'brand_id' not in columns:
+                db.session.execute(text("ALTER TABLE products ADD COLUMN brand_id INTEGER"))
+                db.session.commit()
+                print("  ✓ Added missing brand_id column to products table")
+        if 'product_variants' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('product_variants')]
+            if 'low_stock_threshold' not in columns:
+                db.session.execute(text("ALTER TABLE product_variants ADD COLUMN low_stock_threshold INTEGER DEFAULT 5"))
+                db.session.commit()
+                print("  ✓ Added missing low_stock_threshold column to product_variants table")
+    except Exception as e:
+        db.session.rollback()
+        print(f"  Note on column alignment: {e}")
+
     # 2. Seed Default Users
     print("\n[1/5] Checking / Seeding Default Users...")
     admin_user = User.query.filter_by(username="admin").first()
