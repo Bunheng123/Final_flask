@@ -195,16 +195,18 @@ def account_orders():
 
     orders = query.order_by(Order.created_at.desc()).all()
 
-    # Precalculate cancellation eligibility & remaining grace seconds for countdown
+    # Precalculate cancellation eligibility & remaining grace seconds for countdown (default 2 hours)
+    grace_hours = int(current_app.config.get('GRACE_PERIOD_HOURS', 2))
+    grace_limit_secs = grace_hours * 3600
     now_utc = utc_now()
     for o in orders:
         cancellable = False
         remaining_secs = 0
         if o.status in ('pending', 'confirmed') and o.created_at:
             elapsed = (now_utc - o.created_at).total_seconds()
-            if 0 <= elapsed <= 7200:
+            if 0 <= elapsed <= grace_limit_secs:
                 cancellable = True
-                remaining_secs = max(0, int(7200 - elapsed))
+                remaining_secs = max(0, int(grace_limit_secs - elapsed))
         setattr(o, 'is_cancellable', cancellable)
         setattr(o, 'remaining_seconds', remaining_secs)
 
@@ -263,8 +265,9 @@ def account_order_detail(order_number: str):
     if not order:
         abort(404)
 
-    # 4-hour grace period window calculation
-    grace_seconds = 4 * 3600
+    # Grace period window calculation (default 2 hours)
+    grace_hours = int(current_app.config.get('GRACE_PERIOD_HOURS', 2))
+    grace_seconds = grace_hours * 3600
     if order.created_at:
         time_since_creation = (utc_now() - order.created_at).total_seconds()
         can_cancel = (order.status in ('pending', 'confirmed')) and (time_since_creation <= grace_seconds)
@@ -297,7 +300,7 @@ def account_order_detail(order_number: str):
 @login_required
 def account_order_cancel(order_number: str = None, order_id: int = None):
     """
-    Cancel a pending order within the 4-hour window, restoring inventory and refunding wallet/account.
+    Cancel a pending order within the 2-hour window, restoring inventory and refunding wallet/account.
     Supports lookup by either alphanumeric order_number or integer order_id.
     """
     user = current_user()

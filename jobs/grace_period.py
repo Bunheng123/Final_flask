@@ -70,7 +70,7 @@ def _process_grace_period(grace_hours: int = None) -> list[Order]:
                     notify_user(
                         user_id=order.user_id,
                         title=f"Order #{order.order_number} Auto-Confirmed",
-                        message=f"Your order #{order.order_number} was automatically confirmed after the 4-hour grace period and is now being prepared for shipment.",
+                        message=f"Your order #{order.order_number} was automatically confirmed after the {grace_hours}-hour grace period and is now being prepared for shipment.",
                         type='order'
                     )
                 except Exception:

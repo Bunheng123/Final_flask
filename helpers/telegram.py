@@ -168,7 +168,8 @@ def send_order_receipt(order):
         f"🚚 <b>Shipping:</b> Free\n"
         f"💰 <b>Total:</b> <b>{format_money(order.total_cents)}</b> ({khr_amount})\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📌 <b>Status:</b> <b>{status_badge}</b>"
+        f"📌 <b>Status:</b> <b>{status_badge}</b>\n"
+        f"⏱️ <b>Policy:</b> 2-Hour Grace Period (Free self-service cancellation)"
     )
 
     send_telegram(receipt)
@@ -196,7 +197,7 @@ def send_order_alert(order_number: str, total_str: str, customer_name: str, stat
     if status_clean == 'cancelled':
         emoji = "❌"
         title = "ORDER CANCELLED & REFUNDED"
-        desc = "Order was cancelled within grace period. Inventory restored and paid funds credited to wallet."
+        desc = "Order was cancelled within 2-hour grace period. Inventory restored and paid funds credited to wallet."
     elif status_clean in ('confirmed', 'paid'):
         emoji = "✅"
         title = "ORDER CONFIRMED"

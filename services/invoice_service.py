@@ -269,7 +269,7 @@ def generate_invoice_pdf(order_id: int) -> io.BytesIO:
     outer_summary = Table([
         [
             Paragraph("<font color='#64748B' size='8'>Thank you for your order!<br/>"
-                      "All orders are backed by our 4-hour cancellation grace period.<br/>"
+                      "All orders are backed by our 2-hour cancellation grace period.<br/>"
                       "For warranty & support, visit techstore.com/support.</font>", body_text),
             summary_table
         ]
