@@ -11,6 +11,7 @@ from helpers.upload import (
     UPLOAD_DIR,
     ALLOWED_EXT,
 )
+from bakong_khqr import KHQR
 
 # If run directly as __main__, register 'app' in sys.modules for backwards compatibility
 if __name__ == '__main__':
@@ -87,4 +88,4 @@ def create_admin(username, email, password):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=Config.PORT)

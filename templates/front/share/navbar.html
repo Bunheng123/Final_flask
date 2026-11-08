@@ -1,15 +1,15 @@
 <!-- Navbar -->
-<nav id="mainNav" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300" style="background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.05);">
+<nav id="mainNav" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(210, 210, 215, 0.7);">
   <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
 
     <!-- Logo -->
     <a href="{{ url_for('front_bp.home') }}" class="flex items-center gap-2 group">
-      <div style="width:34px;height:34px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(59,130,246,0.4);transition:all 0.3s;" class="nav-logo-icon">
+      <div style="width:34px;height:34px;background:#0071e3;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(0,113,227,0.25);transition:all 0.3s;" class="nav-logo-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
       </div>
-      <h1 style="font-size:1.25rem;font-weight:800;background:linear-gradient(90deg,#fff,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px;">TechStore</h1>
+      <h1 style="font-size:1.25rem;font-weight:700;color:#1d1d1f;letter-spacing:-0.5px;">TechStore</h1>
     </a>
 
     <!-- Nav Links -->
@@ -23,26 +23,76 @@
         </svg>
         Cart
         {% if cart_count and cart_count > 0 %}
-        <span style="position:absolute;top:-6px;right:-8px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 0 10px rgba(59,130,246,0.6);">
+        <span style="position:absolute;top:-6px;right:-8px;background:#0071e3;color:white;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 0 10px rgba(0,113,227,0.3);">
           {{ cart_count }}
         </span>
         {% endif %}
       </a>
       {% if session.get('is_login') %}
-        <span class="text-xs font-semibold text-slate-300 px-3 py-1.5 flex items-center gap-1.5 bg-slate-800/40 rounded-lg border border-slate-700/50">
-          <i class="bi bi-person-fill text-violet"></i>
-          {{ session.get('username') }}
-        </span>
-        {% if session.get('role') == 'admin' %}
-          <a href="{{ url_for('admin_bp.dashboard') }}" class="nav-link text-violet font-semibold" id="nav-admin">Admin</a>
-        {% endif %}
-        <a href="{{ url_for('front_bp.account') }}" class="nav-link" id="nav-account">Account</a>
-        <form action="{{ url_for('front_bp.logout') }}" method="POST" class="inline m-0 p-0">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-          <button type="submit" class="nav-link bg-transparent border-0 cursor-pointer text-slate-400 hover:text-white transition-colors" title="Logout">
-            Logout
+        <a href="{{ url_for('front_bp.notifications') }}" class="nav-link nav-notification-link" id="nav-notifications" style="position:relative;" title="Notifications">
+          <i class="bi bi-bell-fill text-sm"></i>
+          {% if unread_count and unread_count > 0 %}
+          <span style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 0 10px rgba(239,68,68,0.4);">
+            {{ unread_count }}
+          </span>
+          {% endif %}
+        </a>
+
+        <!-- User Profile Dropdown with Logout -->
+        <div class="relative inline-block text-left" id="userMenuContainer">
+          <button type="button" id="userMenuBtn" class="text-xs font-bold text-[#1d1d1f] px-3.5 py-1.5 flex items-center gap-2 bg-[#f5f5f7] hover:bg-[#e8e8ed] rounded-full border border-[#d2d2d7] transition shadow-xs cursor-pointer select-none">
+            <span class="w-5 h-5 rounded-full bg-[#0071e3] text-white flex items-center justify-center text-[10px] font-bold uppercase">
+              {{ (session.get('username') or 'U')[:1] }}
+            </span>
+            <span>{{ session.get('username') }}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="transition-transform duration-200" id="userMenuChevron"><path d="m6 9 6 6 6-6"/></svg>
           </button>
-        </form>
+
+          <!-- Dropdown Menu -->
+          <div id="userDropdownMenu" class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-[#d2d2d7] shadow-xl py-2 z-50 text-xs font-medium">
+            <!-- User Header -->
+            <div class="px-4 py-2.5 border-b border-[#d2d2d7]/70">
+              <p class="font-bold text-[#1d1d1f] text-sm truncate">{{ session.get('username') }}</p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span class="text-[10px] text-[#6e6e73] uppercase tracking-wider font-semibold">{{ session.get('role')|capitalize or 'Customer' }}</span>
+              </div>
+            </div>
+
+            <!-- Links -->
+            <div class="py-1">
+              {% if session.get('role') == 'admin' %}
+                <a href="{{ url_for('admin_bp.dashboard') }}" class="flex items-center gap-2.5 px-4 py-2 text-[#0071e3] hover:bg-[#f5f5f7] font-semibold transition">
+                  <i class="bi bi-speedometer2 text-sm"></i>
+                  <span>Admin Dashboard</span>
+                </a>
+              {% endif %}
+              <a href="{{ url_for('front_bp.account') }}" class="flex items-center gap-2.5 px-4 py-2 text-[#1d1d1f] hover:bg-[#f5f5f7] transition">
+                <i class="bi bi-person text-sm text-[#86868b]"></i>
+                <span>Account Overview</span>
+              </a>
+              <a href="{{ url_for('front_bp.account_orders') }}" class="flex items-center gap-2.5 px-4 py-2 text-[#1d1d1f] hover:bg-[#f5f5f7] transition">
+                <i class="bi bi-bag-check text-sm text-[#86868b]"></i>
+                <span>Order History</span>
+              </a>
+              <a href="{{ url_for('front_bp.account_wallet') }}" class="flex items-center gap-2.5 px-4 py-2 text-[#1d1d1f] hover:bg-[#f5f5f7] transition">
+                <i class="bi bi-wallet2 text-sm text-[#86868b]"></i>
+                <span>Customer Wallet</span>
+              </a>
+            </div>
+
+            <!-- Logout Section -->
+            <div class="border-t border-[#d2d2d7]/70 p-2">
+              <form action="{{ url_for('front_bp.logout') }}" method="POST" class="m-0 p-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition shadow-sm hover:shadow-md cursor-pointer border border-rose-600">
+                  <i class="bi bi-box-arrow-right text-sm text-white"></i>
+                  <span class="text-white font-bold">Log Out</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
       {% else %}
         <a href="{{ url_for('front_bp.login') }}" class="nav-link" id="nav-login">Login</a>
         <a href="{{ url_for('front_bp.register') }}" class="nav-link" id="nav-register">Register</a>
@@ -53,11 +103,14 @@
 </nav>
 
 <!-- Spacer so content doesn't hide behind fixed nav -->
-<div style="height:72px;"></div>
+<div id="navSpacer" style="height: var(--nav-height, 68px);"></div>
 
 <style>
+  :root {
+    --nav-height: 68px;
+  }
   .nav-link {
-    color: #94a3b8;
+    color: #1d1d1f;
     font-size: 0.9rem;
     font-weight: 500;
     padding: 8px 16px;
@@ -65,7 +118,7 @@
     text-decoration: none;
     transition: all 0.25s ease;
     position: relative;
-    letter-spacing: 0.01em;
+    letter-spacing: -0.01em;
   }
   .nav-link::after {
     content: '';
@@ -75,33 +128,33 @@
     transform: translateX(-50%);
     width: 0;
     height: 2px;
-    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    background: #0071e3;
     border-radius: 99px;
     transition: width 0.3s ease;
   }
   .nav-link:hover {
-    color: #ffffff;
-    background: rgba(255,255,255,0.06);
+    color: #0071e3;
+    background: rgba(0, 0, 0, 0.04);
   }
   .nav-link:hover::after {
     width: 60%;
   }
   .nav-link.active {
-    color: #ffffff;
-    background: rgba(59,130,246,0.12);
+    color: #0071e3;
+    background: rgba(0, 113, 227, 0.08);
   }
   .nav-link.active::after {
     width: 60%;
   }
   .nav-logo-icon:hover {
-    box-shadow: 0 0 30px rgba(59,130,246,0.7) !important;
-    transform: rotate(-5deg) scale(1.05);
+    box-shadow: 0 0 20px rgba(0, 113, 227, 0.4) !important;
+    transform: rotate(-3deg) scale(1.04);
   }
   /* Scrolled state */
   #mainNav.scrolled {
-    background: rgba(2, 6, 23, 0.95) !important;
-    border-bottom-color: rgba(59,130,246,0.15) !important;
-    box-shadow: 0 4px 30px rgba(0,0,0,0.4);
+    background: rgba(255, 255, 255, 0.94) !important;
+    border-bottom-color: rgba(210, 210, 215, 0.9) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   }
 </style>
 
@@ -117,7 +170,53 @@
   // Scroll effect
   window.addEventListener('scroll', function() {
     const nav = document.getElementById('mainNav');
-    if (window.scrollY > 20) nav.classList.add('scrolled');
-    else nav.classList.remove('scrolled');
+    if (nav) {
+      if (window.scrollY > 20) nav.classList.add('scrolled');
+      else nav.classList.remove('scrolled');
+    }
   });
+
+  // User Menu Dropdown Toggle & Click Outside
+  (function() {
+    const btn = document.getElementById('userMenuBtn');
+    const menu = document.getElementById('userDropdownMenu');
+    const chevron = document.getElementById('userMenuChevron');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const isHidden = menu.classList.contains('hidden');
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+      } else {
+        menu.classList.add('hidden');
+        if (chevron) chevron.style.transform = '';
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+        if (chevron) chevron.style.transform = '';
+      }
+    });
+  })();
+
+  // Dynamic Navbar Height Synchronization (ensures exact 0 gap for floating search bars)
+  function syncNavHeight() {
+    const nav = document.getElementById('mainNav');
+    if (nav) {
+      const h = nav.offsetHeight;
+      if (h > 0) {
+        document.documentElement.style.setProperty('--nav-height', h + 'px');
+        const spacer = document.getElementById('navSpacer');
+        if (spacer) spacer.style.height = h + 'px';
+      }
+    }
+  }
+  syncNavHeight();
+  window.addEventListener('DOMContentLoaded', syncNavHeight);
+  window.addEventListener('resize', syncNavHeight);
+  window.addEventListener('load', syncNavHeight);
 </script>

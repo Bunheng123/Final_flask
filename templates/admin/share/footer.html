@@ -1,6 +1,69 @@
-<span>© 2026 Panelbase Inc. All rights reserved.</span>
-      <span class="footer-links">
-        <a href="#">Privacy</a>
-        <a href="#">Terms</a>
-        <a href="#">Help center</a>
+<!-- Admin Apple Style Footer with Developer Task Division -->
+<div class="space-y-4 font-sans">
+  <!-- Developer Task Division -->
+  <div class="border-b border-border/80 pb-3.5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-violet/10 text-violet text-[11px] font-bold">
+          <i class="bi bi-people-fill"></i>
+        </span>
+        <span class="font-bold text-text text-xs tracking-tight">Engineering Team & Divided Tasks</span>
+        <span class="text-[10px] text-text-muted bg-paper px-2 py-0.5 rounded-full border border-border">5 Workstreams</span>
+      </div>
+      <span class="text-[11px] text-text-muted">TechStore / Final-Flask Project</span>
+    </div>
+    
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+      <!-- Dev 1: Thoeung Sereymongkol -->
+      <div class="p-2.5 rounded-xl bg-paper/70 border border-border flex flex-col gap-1 transition-all hover:border-violet/40">
+        <span class="font-bold text-text text-xs">Thoeung Sereymongkol</span>
+        <span class="text-[11px] font-semibold text-violet">Finance & Invoicing</span>
+        <p class="text-[10px] text-text-muted leading-tight">Coupons & Discounts, PDF Invoices, CSV/Excel Sales Reports</p>
+      </div>
+
+      <!-- Dev 2: Lim Bunheng -->
+      <div class="p-2.5 rounded-xl bg-paper/70 border border-border flex flex-col gap-1 transition-all hover:border-violet/40">
+        <span class="font-bold text-text text-xs">Lim Bunheng</span>
+        <span class="text-[11px] font-semibold text-text">Catalog & Inventory</span>
+        <p class="text-[10px] text-text-muted leading-tight">Product Variants & Specs, Atomic Stock Decrement, Brands CRUD</p>
+      </div>
+
+      <!-- Dev 3: Sok Rithysak -->
+      <div class="p-2.5 rounded-xl bg-paper/70 border border-border flex flex-col gap-1 transition-all hover:border-violet/40">
+        <span class="font-bold text-text text-xs">Sok Rithysak</span>
+        <span class="text-[11px] font-semibold text-text">Orders & Automation</span>
+        <p class="text-[10px] text-text-muted leading-tight">Order Lifecycle, 2-Hour Grace Period Job, In-App Notifications</p>
+      </div>
+
+      <!-- Dev 4: Set kimliza -->
+      <div class="p-2.5 rounded-xl bg-paper/70 border border-border flex flex-col gap-1 transition-all hover:border-violet/40">
+        <span class="font-bold text-text text-xs">Set kimliza</span>
+        <span class="text-[11px] font-semibold text-text">Customer & Security</span>
+        <p class="text-[10px] text-text-muted leading-tight">Account Portal, Customer Wishlist, Reviews & JWT Security</p>
+      </div>
+
+      <!-- Dev 5: Tren Mono -->
+      <div class="p-2.5 rounded-xl bg-paper/70 border border-border flex flex-col gap-1 transition-all hover:border-violet/40">
+        <span class="font-bold text-text text-xs">Tren Mono</span>
+        <span class="text-[11px] font-semibold text-text">Payments & Core Ledger</span>
+        <p class="text-[10px] text-text-muted leading-tight">Bakong KHQR, Dual Currency Engine (KHR/USD), Wallet & Split Ledger</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Info -->
+  <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-text-muted">
+    <span>© 2026 TechStore Admin Panel • Apple Store Design Tokens</span>
+    <div class="flex items-center gap-3">
+      <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        Production Port 3000
       </span>
+      <span>•</span>
+      <a href="{{ url_for('front_bp.home') }}" target="_blank" class="text-violet hover:underline flex items-center gap-1 font-medium">
+        <span>View Storefront</span>
+        <i class="bi bi-box-arrow-up-right text-[10px]"></i>
+      </a>
+    </div>
+  </div>
+</div>

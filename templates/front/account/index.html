@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% include 'front/share/header.html' %}
+    <title>My Account — TechStore</title>
+  </head>
+  <body class="bg-white text-[#1d1d1f] antialiased min-h-screen flex flex-col font-sans selection:bg-[#0071e3]/20">
+    <!-- Navbar -->
+    {% include 'front/share/navbar.html' %}
+
+    <main class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full bg-white">
+      <!-- Breadcrumb / Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pb-4 border-b border-[#d2d2d7]">
+        <div>
+          <span class="text-xs uppercase tracking-widest text-[#0071e3] font-semibold">Customer Portal</span>
+          <h1 class="text-3xl font-extrabold text-[#1d1d1f] mt-1">My Account</h1>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="{{ url_for('front_bp.account_orders') }}" class="px-4 py-2 rounded-xl bg-[#f5f5f7] hover:bg-[#e8e8ed] text-sm font-semibold text-[#1d1d1f] transition flex items-center gap-2 border border-[#d2d2d7]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            My Orders ({{ total_orders_count }})
+          </a>
+          <a href="{{ url_for('front_bp.wishlist') }}" class="px-4 py-2 rounded-xl bg-[#0071e3]/10 hover:bg-[#0071e3]/20 text-sm font-semibold text-[#0071e3] transition flex items-center gap-2 border border-[#0071e3]/20">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+            Wishlist
+          </a>
+        </div>
+      </div>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-6 space-y-3">
+            {% for category, message in messages %}
+              <div class="p-4 rounded-xl text-sm font-medium flex items-center justify-between {% if category == 'error' %}bg-rose-50 border border-rose-200 text-rose-700{% else %}bg-emerald-50 border border-emerald-200 text-emerald-700{% endif %}">
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <div class="grid lg:grid-cols-3 gap-8">
+        <!-- Left: Profile Summary Card -->
+        <div class="lg:col-span-1 space-y-6">
+          <div class="bg-[#f5f5f7] border border-[#d2d2d7] rounded-2xl p-6 text-center relative overflow-hidden shadow-sm">
+            <div class="relative inline-block mb-4">
+              {% if user.profile %}
+                <img src="{{ url_for('static', filename='images/user/' ~ get_thumb_name(user.profile)) }}" alt="{{ user.username }}" class="w-28 h-28 rounded-full object-cover border-4 border-[#0071e3]/30 mx-auto shadow-md" />
+              {% else %}
+                <div class="w-28 h-28 rounded-full bg-[#0071e3] flex items-center justify-center text-3xl font-bold text-white border-4 border-white mx-auto shadow-md">
+                  {{ user.username[:2]|upper }}
+                </div>
+              {% endif %}
+            </div>
+
+            <h2 class="text-xl font-bold text-[#1d1d1f]">{{ user.username }}</h2>
+            <p class="text-sm text-[#6e6e73] mt-0.5">{{ user.email }}</p>
+
+            <div class="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-[#0071e3] border border-blue-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              {{ user.role|capitalize }} Account
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-[#d2d2d7] text-left space-y-3 text-xs text-[#6e6e73]">
+              <div class="flex justify-between">
+                <span>Member Since</span>
+                <span class="text-[#1d1d1f] font-medium">{% if user.created_at %}{{ to_local(user.created_at).strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Total Orders</span>
+                <span class="text-[#1d1d1f] font-bold">{{ total_orders_count }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Profile Editing & Password Tabs -->
+        <div class="lg:col-span-2 space-y-8">
+          <!-- Edit Profile Details -->
+          <div class="bg-white border border-[#d2d2d7] rounded-2xl p-6 shadow-sm">
+            <h3 class="text-lg font-bold text-[#1d1d1f] mb-1 flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[#0071e3]"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Edit Profile Details
+            </h3>
+            <p class="text-xs text-[#6e6e73] mb-6">Update your account username, email address, and profile avatar.</p>
+
+            <form action="{{ url_for('front_bp.account') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="action" value="update_profile"/>
+
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-[#1d1d1f] uppercase tracking-wider mb-2">Username</label>
+                  <input type="text" name="username" value="{{ user.username }}" required class="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-1 focus:ring-[#0071e3] transition"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-[#1d1d1f] uppercase tracking-wider mb-2">Email Address</label>
+                  <input type="email" name="email" value="{{ user.email }}" required class="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-1 focus:ring-[#0071e3] transition"/>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-[#1d1d1f] uppercase tracking-wider mb-2">Profile Avatar (JPG, PNG, WEBP)</label>
+                <input type="file" name="profile" accept="image/*" class="w-full text-xs text-[#6e6e73] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#0071e3] file:text-white hover:file:bg-[#0077ed] cursor-pointer bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl p-2"/>
+              </div>
+
+              <div class="pt-2 flex justify-end">
+                <button type="submit" class="apple-btn text-sm font-semibold flex items-center gap-2">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Change Password -->
+          <div class="bg-white border border-[#d2d2d7] rounded-2xl p-6 shadow-sm">
+            <h3 class="text-lg font-bold text-[#1d1d1f] mb-1 flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[#0071e3]"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Change Password
+            </h3>
+            <p class="text-xs text-[#6e6e73] mb-6">Enhance your account security with a strong password (minimum 8 characters).</p>
+
+            <form action="{{ url_for('front_bp.account') }}" method="POST" class="space-y-4">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="action" value="change_password"/>
+
+              <div>
+                <label class="block text-xs font-semibold text-[#1d1d1f] uppercase tracking-wider mb-2">Current Password</label>
+                <input type="password" name="current_password" required class="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-1 focus:ring-[#0071e3] transition"/>
+              </div>
+
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-[#1d1d1f] uppercase tracking-wider mb-2">New Password</label>
+                  <input type="password" name="new_password" minlength="8" required class="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-1 focus:ring-[#0071e3] transition"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-[#1d1d1f] uppercase tracking-wider mb-2">Confirm New Password</label>
+                  <input type="password" name="confirm_password" minlength="8" required class="w-full bg-[#f5f5f7] border border-[#d2d2d7] rounded-xl px-4 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-1 focus:ring-[#0071e3] transition"/>
+                </div>
+              </div>
+
+              <div class="pt-2 flex justify-end">
+                <button type="submit" class="px-6 py-2.5 rounded-full bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-semibold text-sm border border-[#d2d2d7] transition">
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Recent Orders Preview -->
+          {% if recent_orders %}
+            <div class="bg-white border border-[#d2d2d7] rounded-2xl p-6 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-[#1d1d1f]">Recent Orders</h3>
+                <a href="{{ url_for('front_bp.account_orders') }}" class="text-xs text-[#0071e3] hover:text-[#0077ed] font-semibold transition">View all orders &rarr;</a>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-[#1d1d1f]">
+                  <thead class="text-xs uppercase bg-[#f5f5f7] text-[#6e6e73]">
+                    <tr>
+                      <th class="px-4 py-3 rounded-l-lg">Order #</th>
+                      <th class="px-4 py-3">Date</th>
+                      <th class="px-4 py-3">Status</th>
+                      <th class="px-4 py-3">Total</th>
+                      <th class="px-4 py-3 text-right rounded-r-lg">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[#d2d2d7]">
+                    {% for ord in recent_orders %}
+                      <tr class="hover:bg-[#f5f5f7] transition">
+                        <td class="px-4 py-3 font-semibold text-[#1d1d1f]">#{{ ord.order_number }}</td>
+                        <td class="px-4 py-3 text-xs text-[#6e6e73]">{% if ord.created_at %}{{ to_local(ord.created_at).strftime('%b %d, %Y') }}{% endif %}</td>
+                        <td class="px-4 py-3">
+                          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold {% if ord.status == 'delivered' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif ord.status == 'cancelled' %}bg-rose-50 text-rose-700 border border-rose-200{% elif ord.status == 'shipped' %}bg-sky-50 text-sky-700 border border-sky-200{% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
+                            {{ ord.status|capitalize }}
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 font-bold text-[#0071e3]">{{ format_money(ord.total_cents) }}</td>
+                        <td class="px-4 py-3 text-right">
+                          <a href="{{ url_for('front_bp.account_order_detail', order_number=ord.order_number) }}" class="text-xs text-[#0071e3] hover:text-[#0077ed] font-semibold">View</a>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    {% include 'front/share/footer.html' %}
+  </body>
+</html>
+

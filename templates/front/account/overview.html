@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include 'front/share/header.html' %}
+  <title>My Account - TechStore</title>
+</head>
+<body class="bg-white text-[#1d1d1f] min-h-screen flex flex-col font-sans selection:bg-[#0071e3]/20">
+
+  <!-- Navbar -->
+  {% include 'front/share/navbar.html' %}
+
+  <!-- Account Container -->
+  <main class="max-w-7xl mx-auto px-6 py-10 flex-1 w-full bg-white">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-6 space-y-2">
+          {% for category, message in messages %}
+            <div class="p-4 rounded-2xl text-sm font-medium flex items-center justify-between border {% if category == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-800{% elif category == 'error' %}bg-rose-50 border-rose-200 text-rose-800{% else %}bg-blue-50 border-blue-200 text-[#0071e3]{% endif %}">
+              <span>{{ message }}</span>
+              <button onclick="this.parentElement.remove()" class="text-xs opacity-70 hover:opacity-100">&times;</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <div>
+        <p class="text-xs font-bold tracking-wider uppercase text-[#0071e3] mb-1">Customer Portal</p>
+        <h1 class="text-3xl font-extrabold text-[#1d1d1f]">Account Overview</h1>
+        <p class="text-[#6e6e73] text-sm mt-1">Manage your profile, wallet, and order history.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="{{ url_for('front_bp.account_orders') }}" class="apple-btn text-sm font-semibold flex items-center gap-2">
+          <i class="bi bi-bag-check-fill"></i> View All Orders
+        </a>
+      </div>
+    </div>
+
+    <!-- Overview Grid -->
+    <div class="grid lg:grid-cols-3 gap-8">
+      <!-- Profile Card -->
+      <div class="bg-[#f5f5f7] rounded-3xl p-6 border border-[#d2d2d7] shadow-sm flex flex-col justify-between">
+        <div>
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-16 h-16 rounded-2xl overflow-hidden bg-white flex items-center justify-center border border-[#d2d2d7] shadow-sm">
+              {% if user.profile %}
+                <img src="{{ url_for('static', filename='images/user/' ~ user.profile) }}" alt="{{ user.username }}" class="w-full h-full object-cover">
+              {% else %}
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[#0071e3]">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              {% endif %}
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-[#1d1d1f]">{{ user.username }}</h2>
+              <span class="inline-block mt-1 px-2.5 py-0.5 text-xs font-semibold rounded-full {% if user.role == 'admin' %}bg-purple-50 text-purple-700 border border-purple-200{% else %}bg-blue-50 text-[#0071e3] border border-blue-200{% endif %}">
+                {{ user.role|capitalize }}
+              </span>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between py-2 border-b border-[#d2d2d7]">
+              <span class="text-[#6e6e73]">Email Address</span>
+              <span class="font-medium text-[#1d1d1f] truncate max-w-[180px]">{{ user.email }}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-[#d2d2d7]">
+              <span class="text-[#6e6e73]">Account Status</span>
+              <span class="font-medium text-emerald-600 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Active
+              </span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-[#d2d2d7]">
+              <span class="text-[#6e6e73]">Self-Service Grace</span>
+              <span class="font-bold text-[#0071e3]">2-Hour Cancel</span>
+            </div>
+            <div class="flex justify-between py-2">
+              <span class="text-[#6e6e73]">Member Since</span>
+              <span class="font-medium text-[#1d1d1f]">
+                {% if user.created_at %}
+                  {{ to_local(user.created_at).strftime('%b %d, %Y') }}
+                {% else %}
+                  N/A
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-[#d2d2d7] flex gap-3">
+          <a href="{{ url_for('front_bp.wishlist') }}" class="flex-1 text-center py-2.5 px-4 bg-white hover:bg-[#e8e8ed] text-[#1d1d1f] rounded-xl text-sm font-semibold transition border border-[#d2d2d7]">
+            Wishlist ({{ wishlist_count if wishlist_count is defined else 0 }})
+          </a>
+          <a href="{{ url_for('front_bp.products') }}" class="flex-1 text-center apple-btn text-sm font-semibold">
+            Shop Store
+          </a>
+        </div>
+      </div>
+
+      <!-- Stats & Quick Actions -->
+      <div class="lg:col-span-2 space-y-8">
+        <!-- Quick Stats -->
+        <div class="grid sm:grid-cols-2 gap-4">
+          <a href="{{ url_for('front_bp.account_wallet') }}" class="bg-[#f5f5f7] rounded-3xl p-5 border border-[#d2d2d7] flex items-center justify-between gap-4 hover:border-[#0071e3]/40 transition sm:col-span-2 shadow-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-[#6e6e73] font-semibold">Customer Wallet & Store Credit</p>
+              <h3 class="text-2xl font-bold text-[#0071e3] mt-0.5">
+                {% if khr_format is defined and user.wallet_balance_khr is defined %}
+                  {{ khr_format(user.wallet_balance_khr) }}
+                {% elif wallet_balance_khr is defined %}
+                  {{ wallet_balance_khr }} KHR
+                {% else %}
+                  0 KHR
+                {% endif %}
+                <span class="text-sm font-normal text-[#6e6e73] ml-2">
+                  (${% if user_balance is defined %}{{ "%.2f"|format(user_balance) }}{% elif user.wallet_balance_cents is defined %}{{ "%.2f"|format(user.wallet_balance_cents / 100) }}{% else %}0.00{% endif %})
+                </span>
+              </h3>
+              <p class="text-xs text-[#6e6e73] mt-1">Automated 100% instant refund from cancelled orders</p>
+            </div>
+            <span class="text-sm font-semibold text-[#0071e3] flex items-center gap-1">View refund wallet &rarr;</span>
+          </a>
+
+          <div class="bg-[#f5f5f7] rounded-3xl p-5 border border-[#d2d2d7] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-2xl bg-[#0071e3]/10 border border-[#0071e3]/20 flex items-center justify-center text-[#0071e3]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-[#6e6e73] font-semibold">Total Orders</p>
+              <h3 class="text-2xl font-bold text-[#1d1d1f] mt-0.5">{{ orders_count if orders_count is defined else (orders|length if orders is defined else (recent_orders|length if recent_orders is defined else 0)) }}</h3>
+            </div>
+          </div>
+
+          <div class="bg-[#f5f5f7] rounded-3xl p-5 border border-[#d2d2d7] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-2xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-[#6e6e73] font-semibold">Saved Items</p>
+              <h3 class="text-2xl font-bold text-[#1d1d1f] mt-0.5">{{ wishlist_count if wishlist_count is defined else 0 }}</h3>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Orders Section -->
+        <div class="bg-white rounded-3xl p-6 border border-[#d2d2d7] shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-[#1d1d1f]">Recent Orders</h2>
+            {% set order_list = orders if orders is defined and orders else (recent_orders if recent_orders is defined and recent_orders else []) %}
+            {% if order_list|length > 0 %}
+              <a href="{{ url_for('front_bp.account_orders') }}" class="text-xs font-semibold text-[#0071e3] hover:text-[#0077ed] transition">
+                View all ({{ order_list|length }}) &rarr;
+              </a>
+            {% endif %}
+          </div>
+
+          {% if order_list %}
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-[#1d1d1f]">
+                <thead class="text-xs uppercase tracking-wider text-[#6e6e73] border-b border-[#d2d2d7] pb-2">
+                  <tr>
+                    <th class="py-3 px-2">Order #</th>
+                    <th class="py-3 px-2">Date</th>
+                    <th class="py-3 px-2">Total</th>
+                    <th class="py-3 px-2">Status</th>
+                    <th class="py-3 px-2 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#d2d2d7]">
+                  {% for order in order_list %}
+                    <tr class="hover:bg-[#f5f5f7] transition">
+                      <td class="py-3 px-2 font-mono font-medium text-[#1d1d1f]">
+                        <a href="{{ url_for('front_bp.account_order_detail', order_number=order.order_number) }}" class="text-[#0071e3] hover:underline">
+                          {{ order.order_number }}
+                        </a>
+                      </td>
+                      <td class="py-3 px-2 text-[#6e6e73]">
+                        {% if order.created_at and to_local is defined %}
+                          {{ to_local(order.created_at).strftime('%b %d, %Y') }}
+                        {% elif order.created_at %}
+                          {{ order.created_at.strftime('%b %d, %Y') }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </td>
+                      <td class="py-3 px-2 font-black text-[#0071e3]">
+                        {% if format_money is defined %}
+                          {{ format_money(order.total_cents) }}
+                        {% else %}
+                          ${{ "%.2f"|format(order.total_cents / 100) }}
+                        {% endif %}
+                      </td>
+                      <td class="py-3 px-2">
+                        {% if order.status == 'confirmed' %}
+                          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#0071e3] border border-blue-200">Confirmed</span>
+                        {% elif order.status == 'shipped' %}
+                          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">Shipped</span>
+                        {% elif order.status == 'delivered' %}
+                          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Delivered</span>
+                        {% elif order.status == 'cancelled' %}
+                          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">Cancelled</span>
+                        {% else %}
+                          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>
+                        {% endif %}
+                      </td>
+                      <td class="py-3 px-2 text-right">
+                        <a href="{{ url_for('front_bp.account_order_detail', order_number=order.order_number) }}" class="text-[#0071e3] hover:text-[#0077ed] text-xs font-bold">
+                          View &rarr;
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="py-12 text-center text-[#6e6e73]">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto mb-3 text-[#86868b]">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+              </svg>
+              <p class="font-semibold text-[#1d1d1f]">You haven't placed any orders yet.</p>
+              <p class="text-xs text-[#6e6e73] mt-1">When you place an order, it will show up here.</p>
+              <a href="{{ url_for('front_bp.products') }}" class="apple-btn inline-block mt-4 text-xs font-bold">
+                Start Shopping
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  {% include 'front/share/footer.html' %}
+</body>
+</html>

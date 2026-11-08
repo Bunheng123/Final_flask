@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% include 'front/share/header.html' %}
+    <title>Order #{{ order.order_number }} — TechStore</title>
+  </head>
+  <body class="bg-white text-[#1d1d1f] antialiased min-h-screen flex flex-col font-sans selection:bg-[#0071e3]/20">
+    <!-- Navbar -->
+    {% include 'front/share/navbar.html' %}
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex-grow w-full bg-white">
+      <!-- Breadcrumb & Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pb-5 border-b border-[#d2d2d7]">
+        <div>
+          <a href="{{ url_for('front_bp.account_orders') }}" class="inline-flex items-center gap-1.5 text-xs text-[#0071e3] hover:text-[#0077ed] font-medium transition mb-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            Back to Order History
+          </a>
+          <h1 class="text-3xl font-extrabold text-[#1d1d1f] tracking-tight flex items-center gap-3">
+            <span>Order #{{ order.order_number }}</span>
+            <span class="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 {% if order.status == 'delivered' %}bg-emerald-50 text-emerald-700 border border-emerald-300{% elif order.status == 'cancelled' %}bg-rose-50 text-rose-700 border border-rose-300{% elif order.status == 'shipped' %}bg-sky-50 text-sky-700 border border-sky-300{% elif order.status == 'confirmed' %}bg-blue-50 text-[#0071e3] border border-blue-300{% else %}bg-amber-50 text-amber-700 border border-amber-300{% endif %}">
+              <span class="w-2 h-2 rounded-full {% if order.status == 'delivered' %}bg-emerald-500{% elif order.status == 'cancelled' %}bg-rose-500{% elif order.status == 'shipped' %}bg-sky-500{% elif order.status == 'confirmed' %}bg-[#0071e3]{% else %}bg-amber-500 animate-pulse{% endif %}"></span>
+              {{ order.status|capitalize }}
+            </span>
+          </h1>
+          <p class="text-xs text-[#6e6e73] mt-1">Placed on {% if order.created_at and to_local is defined %}{{ to_local(order.created_at).strftime('%B %d, %Y at %I:%M %p') }}{% elif order.created_at %}{{ order.created_at.strftime('%B %d, %Y') }}{% endif %}</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          {% if order.status in ('confirmed', 'shipped', 'delivered') %}
+            <a href="{{ url_for('front_bp.invoice_pdf', order_identifier=order.order_number) }}"
+               class="px-4 py-2 rounded-xl bg-[#f5f5f7] hover:bg-[#e8e8ed] text-xs font-semibold text-[#1d1d1f] transition border border-[#d2d2d7] flex items-center gap-2 shadow-xs">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download PDF Invoice
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-6 space-y-3">
+            {% for category, message in messages %}
+              <div class="p-4 rounded-xl text-xs font-medium flex items-center justify-between {% if category == 'error' %}bg-rose-50 border border-rose-200 text-rose-700{% else %}bg-emerald-50 border border-emerald-200 text-emerald-700{% endif %}">
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <!-- KHQR Status Verification (On-Demand to protect 100 req/day quota) -->
+      {% if payment_check_url and order.payment_status == 'pending' %}
+        <div id="order-payment-status" data-payment-check-url="{{ payment_check_url }}"
+          class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-xs text-amber-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <p class="font-bold text-[#1d1d1f] text-sm">Awaiting KHQR Payment</p>
+              <p id="order-payment-status-text" class="text-amber-700 mt-0.5">If you have completed payment in your banking app, click below to verify.</p>
+            </div>
+          </div>
+          <button id="verify-order-status-btn" type="button"
+            class="shrink-0 apple-btn text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="verify-order-btn-text">Verify Payment Status</span>
+          </button>
+        </div>
+        <script>
+          (function () {
+            const panel = document.getElementById('order-payment-status');
+            const statusText = document.getElementById('order-payment-status-text');
+            const verifyBtn = document.getElementById('verify-order-status-btn');
+            const verifyBtnText = document.getElementById('verify-order-btn-text');
+            const checkUrl = panel?.dataset.paymentCheckUrl;
+            if (!checkUrl) return;
+
+            let checking = false;
+            let cooldownTimer = null;
+
+            function startCooldown(seconds) {
+              if (!verifyBtn) return;
+              verifyBtn.disabled = true;
+              verifyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+              let remaining = seconds;
+              if (verifyBtnText) verifyBtnText.textContent = `Please wait (${remaining}s)...`;
+              if (cooldownTimer) clearInterval(cooldownTimer);
+              cooldownTimer = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                  clearInterval(cooldownTimer);
+                  cooldownTimer = null;
+                  verifyBtn.disabled = false;
+                  verifyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                  if (verifyBtnText) verifyBtnText.textContent = 'Verify Payment Status';
+                } else {
+                  if (verifyBtnText) verifyBtnText.textContent = `Please wait (${remaining}s)...`;
+                }
+              }, 1000);
+            }
+
+            async function checkPayment() {
+              if (checking) return;
+              checking = true;
+              startCooldown(5);
+              if (statusText) statusText.textContent = 'Verifying with Bakong Open API...';
+              try {
+                const response = await fetch(checkUrl, { cache: 'no-store', headers: { Accept: 'application/json' } });
+                const result = await response.json();
+                if (response.ok && result.success && result.data.status === 'paid') {
+                  if (statusText) statusText.textContent = 'KHQR payment confirmed! Updating order status...';
+                  window.setTimeout(() => window.location.reload(), 800);
+                } else if (response.ok && result.success && result.data.status === 'expired') {
+                  if (statusText) statusText.textContent = 'KHQR payment expired. Any reserved wallet funds have been returned.';
+                } else {
+                  if (statusText) statusText.textContent = 'Payment not detected yet. If you have already paid, please wait a moment and try again.';
+                }
+              } catch (error) {
+                if (statusText) statusText.textContent = 'Payment status check momentarily unavailable. Please retry.';
+              } finally {
+                checking = false;
+              }
+            }
+
+            verifyBtn?.addEventListener('click', checkPayment);
+          })();
+        </script>
+      {% endif %}
+
+      <!-- 2-Hour Cancellation Grace Period Banner -->
+      {% if can_cancel %}
+        <div class="mb-8 p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+          <div class="flex items-start gap-3.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="text-sm font-bold text-amber-900">2-Hour Cancellation Window Active</h4>
+                <span id="countdown-badge" class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-mono text-xs font-bold border border-amber-300">
+                  Calculating...
+                </span>
+              </div>
+              <p class="text-xs text-amber-700 mt-1">
+                You can cancel this order within 2 hours of placement for an instant full refund (to your wallet) and inventory return.
+              </p>
+            </div>
+          </div>
+          <form id="cancel-order-form" action="{{ url_for('front_bp.account_order_cancel', order_number=order.order_number) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel Order #{{ order.order_number }}? Inventory stock will be restored and any paid funds credited to your wallet.');" class="shrink-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button id="cancel-btn" type="submit"
+                    class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 cursor-pointer border border-rose-600"
+                    style="background-color: #e11d48 !important; color: #ffffff !important;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              <span>Cancel This Order</span>
+            </button>
+          </form>
+        </div>
+
+        <script>
+          // Live JavaScript Grace Period Countdown
+          (function() {
+            var remaining = {{ time_remaining_seconds if time_remaining_seconds is defined else 0 }};
+            var badge = document.getElementById('countdown-badge');
+            var cancelBtn = document.getElementById('cancel-btn');
+
+            function updateTimer() {
+              if (remaining <= 0) {
+                badge.textContent = "Expired";
+                badge.className = "px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-mono text-xs font-bold border border-rose-200";
+                if (cancelBtn) {
+                  cancelBtn.disabled = true;
+                  cancelBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                return;
+              }
+              var hours = Math.floor(remaining / 3600);
+              var minutes = Math.floor((remaining % 3600) / 60);
+              var seconds = remaining % 60;
+              badge.textContent = hours + "h " + (minutes < 10 ? "0" : "") + minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s left";
+              remaining--;
+              setTimeout(updateTimer, 1000);
+            }
+            updateTimer();
+          })();
+        </script>
+      {% elif order.status == 'cancelled' %}
+        <div class="mb-8 p-5 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3.5 shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-rose-800">Order Cancelled</h4>
+            <p class="text-xs text-rose-700 mt-0.5">
+              This order was cancelled on {% if order.cancelled_at and to_local is defined %}{{ to_local(order.cancelled_at).strftime('%B %d, %Y at %I:%M %p') }}{% elif order.cancelled_at %}{{ order.cancelled_at.strftime('%B %d, %Y') }}{% else %}N/A{% endif %}.
+              Reserved inventory stock has been restored.
+            </p>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Visual Order Progression Pipeline Tracker -->
+      {% if order.status != 'cancelled' %}
+        <div class="bg-[#f5f5f7] border border-[#d2d2d7] rounded-2xl p-6 mb-8 shadow-sm">
+          <h3 class="text-xs font-bold text-[#6e6e73] uppercase tracking-wider mb-6">Delivery Progression</h3>
+          <div class="grid grid-cols-4 relative gap-2 sm:gap-4">
+            <!-- Connecting progress bar line -->
+            <div class="absolute top-4 left-6 right-6 h-0.5 bg-[#d2d2d7] -z-0">
+              <div class="h-full bg-[#0071e3] transition-all duration-500" style="width: {% if order.status == 'delivered' %}100%{% elif order.status == 'shipped' %}66%{% elif order.status == 'confirmed' %}33%{% else %}5%{% endif %};"></div>
+            </div>
+
+            <!-- Step 1: Placed -->
+            <div class="flex flex-col items-center text-center relative z-10">
+              <div class="w-8 h-8 rounded-full bg-[#0071e3] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span class="text-xs font-bold text-[#1d1d1f] mt-2">Order Placed</span>
+              <span class="text-[10px] text-[#6e6e73] mt-0.5">{% if order.created_at and to_local is defined %}{{ to_local(order.created_at).strftime('%b %d, %I:%M %p') }}{% elif order.created_at %}{{ order.created_at.strftime('%b %d') }}{% endif %}</span>
+            </div>
+
+            <!-- Step 2: Confirmed -->
+            <div class="flex flex-col items-center text-center relative z-10">
+              <div class="w-8 h-8 rounded-full {% if order.status in ('confirmed', 'shipped', 'delivered') %}bg-[#0071e3] text-white shadow-sm{% else %}bg-[#e8e8ed] text-[#86868b] border border-[#d2d2d7]{% endif %} flex items-center justify-center font-bold text-xs">
+                {% if order.status in ('confirmed', 'shipped', 'delivered') %}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                {% else %}
+                  2
+                {% endif %}
+              </div>
+              <span class="text-xs font-bold {% if order.status in ('confirmed', 'shipped', 'delivered') %}text-[#1d1d1f]{% else %}text-[#86868b]{% endif %} mt-2">Confirmed</span>
+              <span class="text-[10px] text-[#6e6e73] mt-0.5">
+                {% if order.confirmed_at and to_local is defined %}{{ to_local(order.confirmed_at).strftime('%b %d, %I:%M %p') }}{% elif order.status in ('confirmed', 'shipped', 'delivered') %}Processing{% else %}Pending{% endif %}
+              </span>
+            </div>
+
+            <!-- Step 3: Shipped -->
+            <div class="flex flex-col items-center text-center relative z-10">
+              <div class="w-8 h-8 rounded-full {% if order.status in ('shipped', 'delivered') %}bg-[#0071e3] text-white shadow-sm{% else %}bg-[#e8e8ed] text-[#86868b] border border-[#d2d2d7]{% endif %} flex items-center justify-center font-bold text-xs">
+                {% if order.status in ('shipped', 'delivered') %}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                {% else %}
+                  3
+                {% endif %}
+              </div>
+              <span class="text-xs font-bold {% if order.status in ('shipped', 'delivered') %}text-[#1d1d1f]{% else %}text-[#86868b]{% endif %} mt-2">Shipped</span>
+              <span class="text-[10px] text-[#6e6e73] mt-0.5">
+                {% if order.shipped_at and to_local is defined %}{{ to_local(order.shipped_at).strftime('%b %d, %I:%M %p') }}{% elif order.status in ('shipped', 'delivered') %}On Route{% else %}Awaiting{% endif %}
+              </span>
+            </div>
+
+            <!-- Step 4: Delivered -->
+            <div class="flex flex-col items-center text-center relative z-10">
+              <div class="w-8 h-8 rounded-full {% if order.status == 'delivered' %}bg-emerald-600 text-white shadow-sm{% else %}bg-[#e8e8ed] text-[#86868b] border border-[#d2d2d7]{% endif %} flex items-center justify-center font-bold text-xs">
+                {% if order.status == 'delivered' %}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                {% else %}
+                  4
+                {% endif %}
+              </div>
+              <span class="text-xs font-bold {% if order.status == 'delivered' %}text-emerald-600{% else %}text-[#86868b]{% endif %} mt-2">Delivered</span>
+              <span class="text-[10px] text-[#6e6e73] mt-0.5">
+                {% if order.delivered_at and to_local is defined %}{{ to_local(order.delivered_at).strftime('%b %d, %I:%M %p') }}{% elif order.status == 'delivered' %}Delivered{% else %}Pending{% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="grid lg:grid-cols-3 gap-8">
+        <!-- Itemized Breakdown (2 Cols) -->
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-white border border-[#d2d2d7] rounded-2xl p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-[#d2d2d7]">
+              <h3 class="text-base font-bold text-[#1d1d1f] flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[#0071e3]"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                Purchased Products ({{ order.items|length }})
+              </h3>
+              {% if order.status in ('confirmed', 'delivered') %}
+                <span class="text-[11px] text-[#0071e3] font-semibold">Verified Purchase Reviews Eligible</span>
+              {% endif %}
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-[#1d1d1f]">
+                <thead class="text-[11px] uppercase bg-[#f5f5f7] text-[#6e6e73] tracking-wider">
+                  <tr>
+                    <th class="px-4 py-3 rounded-l-xl">Product</th>
+                    <th class="px-4 py-3">SKU</th>
+                    <th class="px-4 py-3">Price</th>
+                    <th class="px-4 py-3 text-center">Qty</th>
+                    <th class="px-4 py-3 text-right rounded-r-xl">Total</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#d2d2d7]">
+                  {% for item in order.items %}
+                    <tr class="hover:bg-[#f5f5f7] transition group">
+                      <td class="px-4 py-4">
+                        <div class="font-bold text-[#1d1d1f] group-hover:text-[#0071e3] transition">{{ item.product_name }}</div>
+                        {% if item.spec_name %}<div class="text-xs text-[#0071e3] font-bold mt-0.5">{{ item.spec_name }}</div>{% endif %}
+
+                        <!-- Review Action Link for Confirmed/Delivered Orders -->
+                        {% if order.status in ('confirmed', 'delivered') and item.variant and item.variant.product_id %}
+                          <div class="mt-2">
+                            <a href="{{ url_for('front_bp.product', product_id=item.variant.product_id) }}#reviews-section"
+                               class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-500 hover:text-amber-600 transition">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                              Write Review
+                            </a>
+                          </div>
+                        {% endif %}
+                      </td>
+                      <td class="px-4 py-4 text-xs font-mono text-[#86868b]">{{ item.sku }}</td>
+                      <td class="px-4 py-4 text-xs font-semibold text-[#1d1d1f]">
+                        {% if format_money is defined %}
+                          {{ format_money(item.unit_price_cents) }}
+                        {% else %}
+                          ${{ "%.2f"|format(item.unit_price_cents / 100) }}
+                        {% endif %}
+                      </td>
+                      <td class="px-4 py-4 text-center font-bold text-[#1d1d1f]">{{ item.qty }}</td>
+                      <td class="px-4 py-4 text-right font-black text-[#0071e3]">
+                        {% if format_money is defined %}
+                          {{ format_money(item.line_total_cents) }}
+                        {% else %}
+                          ${{ "%.2f"|format(item.line_total_cents / 100) }}
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Totals Summary Breakdown -->
+            <div class="mt-6 pt-6 border-t border-[#d2d2d7] space-y-2.5 text-xs max-w-xs ml-auto">
+              <div class="flex justify-between text-[#6e6e73]">
+                <span>Subtotal</span>
+                <span class="text-[#1d1d1f] font-semibold">
+                  {% if format_money is defined %}
+                    {{ format_money(order.subtotal_cents) }}
+                  {% else %}
+                    ${{ "%.2f"|format(order.subtotal_cents / 100) }}
+                  {% endif %}
+                </span>
+              </div>
+              {% if order.discount_cents and order.discount_cents > 0 %}
+                <div class="flex justify-between text-emerald-600">
+                  <span class="flex items-center gap-1.5 font-semibold">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    Discount {% if order.coupon_code %}<code class="text-[10px] bg-emerald-50 text-emerald-700 px-1 py-0.5 rounded border border-emerald-200">({{ order.coupon_code }})</code>{% endif %}
+                  </span>
+                  <span class="font-bold">
+                    -{% if format_money is defined %}{{ format_money(order.discount_cents) }}{% else %}${{ "%.2f"|format(order.discount_cents / 100) }}{% endif %}
+                  </span>
+                </div>
+              {% endif %}
+              <div class="flex justify-between text-[#6e6e73]">
+                <span>Shipping Fee</span>
+                <span class="text-emerald-600 font-semibold">Free</span>
+              </div>
+              <div class="flex justify-between text-base font-black text-[#1d1d1f] pt-3 border-t border-[#d2d2d7]">
+                <span>Total Due</span>
+                <div class="text-right">
+                  <span class="text-[#0071e3] block">
+                    {% if format_money is defined %}
+                      {{ format_money(order.total_cents) }}
+                    {% else %}
+                      ${{ "%.2f"|format(order.total_cents / 100) }}
+                    {% endif %}
+                  </span>
+                  <span class="text-[11px] font-normal text-[#86868b]">
+                    &asymp; {% if khr_format is defined and order.total_khr %}{{ khr_format(order.total_khr) }}{% else %}{{ "{:,}".format((order.total_cents * 41)|int) }} &#x17DB;{% endif %}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Customer & Delivery Details (1 Col) -->
+        <div class="lg:col-span-1 space-y-6">
+          <!-- Delivery Card -->
+          <div class="bg-white border border-[#d2d2d7] rounded-2xl p-6 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-[#1d1d1f] border-b border-[#d2d2d7] pb-3 flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[#0071e3]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Shipping Address & Contact
+            </h3>
+            <div class="text-xs space-y-3 text-[#6e6e73]">
+              <div>
+                <span class="block text-[#86868b] uppercase tracking-wider text-[10px] font-semibold">Recipient Name</span>
+                <span class="text-[#1d1d1f] font-semibold text-sm">{{ order.customer_name }}</span>
+              </div>
+              <div>
+                <span class="block text-[#86868b] uppercase tracking-wider text-[10px] font-semibold">Email Address</span>
+                <span class="text-[#1d1d1f] font-medium">{{ order.email }}</span>
+              </div>
+              <div>
+                <span class="block text-[#86868b] uppercase tracking-wider text-[10px] font-semibold">Phone Number</span>
+                <span class="text-[#1d1d1f] font-medium">{{ order.phone }}</span>
+              </div>
+              <div>
+                <span class="block text-[#86868b] uppercase tracking-wider text-[10px] font-semibold">Delivery Address</span>
+                <span class="text-[#1d1d1f] font-medium leading-relaxed block mt-0.5">{{ order.address }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Card -->
+          <div class="bg-white border border-[#d2d2d7] rounded-2xl p-6 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-[#1d1d1f] border-b border-[#d2d2d7] pb-3 flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-[#0071e3]"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              Payment Information
+            </h3>
+            <div class="text-xs space-y-3 text-[#6e6e73]">
+              <div class="flex justify-between items-center">
+                <span class="text-[#6e6e73]">Method</span>
+                <span class="text-[#1d1d1f] font-semibold uppercase tracking-wider bg-[#f5f5f7] px-2 py-0.5 rounded border border-[#d2d2d7] text-[11px]">
+                  {{ (order.payment_method or 'COD')|upper }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-[#6e6e73]">Payment Status</span>
+                <span class="font-bold text-xs capitalize {% if order.status == 'cancelled' %}text-rose-600{% elif order.payment_status == 'paid' or order.status in ('confirmed', 'shipped', 'delivered') %}text-emerald-600{% else %}text-amber-600{% endif %}">
+                  {{ order.payment_status or ('Refunded' if order.status == 'cancelled' else 'Confirmed / Paid') }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-[#6e6e73]">Currency</span>
+                <span class="text-[#1d1d1f] font-medium">USD ($) / KHR (&#x17DB;)</span>
+              </div>
+              {% if order.wallet_used_khr and order.wallet_used_khr > 0 %}
+                <div class="flex justify-between items-center">
+                  <span class="text-[#6e6e73]">Wallet Credit Applied</span>
+                  <span class="text-[#0071e3] font-mono font-bold">{{ khr_format(order.wallet_used_khr) if khr_format is defined else order.wallet_used_khr }}</span>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    {% include 'front/share/footer.html' %}
+  </body>
+</html>

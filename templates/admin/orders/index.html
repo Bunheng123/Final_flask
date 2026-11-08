@@ -1,0 +1,527 @@
+{% extends 'admin/master.html' %}
+
+{% block tab_title %}Orders{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-5 space-y-2">
+        {% for category, message in messages %}
+          <div class="p-4 rounded-xl text-sm font-medium flex items-center justify-between border {% if category == 'success' %}bg-emerald-500/10 border-emerald-500/20 text-emerald-400{% else %}bg-rose-500/10 border-rose-500/20 text-rose-400{% endif %}">
+            <div class="flex items-center gap-2">
+              <i class="bi {% if category == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+              <span>{{ message }}</span>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-xs opacity-70 hover:opacity-100"><i class="bi bi-x-lg"></i></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+      <h2 class="font-display text-2xl font-bold text-text flex items-center gap-2">
+        <i class="bi bi-bag-check-fill text-violet"></i> Order Management
+      </h2>
+      <p class="text-text-muted text-xs mt-0.5">Control order status progressions, inspect itemized snapshots, and verify Bakong hashes.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="{{ url_for('admin_bp.admin_orders') }}" class="inline-flex items-center gap-2 bg-card hover:bg-paper border border-border text-text py-2 px-4 rounded-lg font-semibold text-xs transition-colors">
+        <i class="bi bi-arrow-clockwise"></i> Reset Filters
+      </a>
+    </div>
+  </div>
+
+  <!-- Status Tabs -->
+  <div class="flex flex-wrap gap-2 mb-5 border-b border-border pb-3">
+    {% set tabs = [
+      ('all', 'All Orders', status_counts.all, 'bi-inbox'),
+      ('pending', 'Pending', status_counts.pending, 'bi-clock-history'),
+      ('confirmed', 'Confirmed', status_counts.confirmed, 'bi-check-circle'),
+      ('shipped', 'Shipped', status_counts.shipped, 'bi-truck'),
+      ('delivered', 'Delivered', status_counts.delivered, 'bi-box-seam-fill'),
+      ('cancelled', 'Cancelled', status_counts.cancelled, 'bi-x-circle')
+    ] %}
+    {% for tab_id, label, count, icon in tabs %}
+      <a href="{{ url_for('admin_bp.admin_orders', status='' if tab_id == 'all' else tab_id, q=search_query, start_date=start_date, end_date=end_date) }}"
+         class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all {% if current_status == tab_id or (tab_id == 'all' and current_status == '') %}bg-violet text-white shadow-md shadow-violet/20{% else %}bg-card border border-border text-text-muted hover:text-text hover:bg-paper{% endif %}">
+        <i class="bi {{ icon }}"></i>
+        <span>{{ label }}</span>
+        <span class="px-1.5 py-0.5 rounded-full text-[10px] {% if current_status == tab_id or (tab_id == 'all' and current_status == '') %}bg-white/20 text-white{% else %}bg-paper text-text-muted{% endif %} font-mono">{{ count }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="bg-card border border-border rounded-2xl p-4 mb-6 shadow-sm">
+    <form method="GET" action="{{ url_for('admin_bp.admin_orders') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {% if current_status and current_status != 'all' %}
+        <input type="hidden" name="status" value="{{ current_status }}">
+      {% endif %}
+      <div>
+        <label class="block text-[11px] font-semibold text-text-muted uppercase mb-1">Search Order</label>
+        <div class="relative">
+          <i class="bi bi-search absolute left-3 top-2.5 text-text-muted text-xs"></i>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="Order #, customer, phone..."
+                 class="w-full bg-paper border border-border rounded-lg pl-8 pr-3 py-2 text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-violet">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-text-muted uppercase mb-1">From Date</label>
+        <input type="date" name="start_date" value="{{ start_date }}"
+               class="w-full bg-paper border border-border rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-text-muted uppercase mb-1">To Date</label>
+        <input type="date" name="end_date" value="{{ end_date }}"
+               class="w-full bg-paper border border-border rounded-lg px-3 py-2 text-xs text-text focus:outline-none focus:border-violet">
+      </div>
+      <div class="flex items-end gap-2">
+        <button type="submit" class="w-full bg-violet hover:bg-[#5b4de8] text-white py-2 px-4 rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-1.5">
+          <i class="bi bi-funnel"></i> Apply Filter
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+    {% if orders %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-paper border-b border-border uppercase tracking-wider text-[11px] text-text-muted font-bold">
+            <tr>
+              <th class="px-5 py-3.5">Order Number</th>
+              <th class="px-5 py-3.5">Date (GMT+7)</th>
+              <th class="px-5 py-3.5">Customer</th>
+              <th class="px-5 py-3.5">Payment & Hash</th>
+              <th class="px-5 py-3.5">Total</th>
+              <th class="px-5 py-3.5">Status</th>
+              <th class="px-5 py-3.5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            {% for order in orders %}
+              {% set local_dt = to_local(order.created_at) %}
+              <tr class="hover:bg-paper/60 transition-colors">
+                <!-- Order Number -->
+                <td class="px-5 py-4 font-mono font-bold text-text">
+                  <a href="javascript:void(0)" onclick="openOrderModal({{ order.id }})" class="text-violet hover:underline flex items-center gap-1.5">
+                    <i class="bi bi-receipt"></i> {{ order.order_number }}
+                  </a>
+                </td>
+
+                <!-- Date -->
+                <td class="px-5 py-4 text-text-muted font-mono whitespace-nowrap">
+                  {{ local_dt.strftime('%Y-%m-%d %I:%M %p') if local_dt else '—' }}
+                </td>
+
+                <!-- Customer -->
+                <td class="px-5 py-4">
+                  <div class="font-semibold text-text">{{ order.customer_name }}</div>
+                  <div class="text-[11px] text-text-muted flex items-center gap-1">
+                    <i class="bi bi-telephone"></i> {{ order.phone }}
+                  </div>
+                </td>
+
+                <!-- Payment & Hash Preview -->
+                <td class="px-5 py-4">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-paper border border-border text-text">
+                    {{ order.payment_method }}
+                  </span>
+                  <div class="mt-1 flex items-center gap-1 text-[11px] font-mono text-text-muted">
+                    <span class="truncate max-w-[90px]" title="{{ order.bakong_hash }}">{{ order.bakong_hash[:10] }}...</span>
+                    <button type="button" onclick="copyHashText('{{ order.bakong_hash }}', this)" class="text-violet hover:text-indigo-400 p-0.5 rounded" title="Copy Bakong MD5 Hash">
+                      <i class="bi bi-clipboard"></i>
+                    </button>
+                  </div>
+                </td>
+
+                <!-- Total -->
+                <td class="px-5 py-4 whitespace-nowrap">
+                  <div class="font-mono font-bold text-text">{{ format_money(order.total_cents) }}</div>
+                  <div class="text-[10px] font-mono text-text-muted">៛{{ "{:,.0f}".format((order.total_cents / 100) * 4000) }}</div>
+                </td>
+
+                <!-- Status Badge -->
+                <td class="px-5 py-4 whitespace-nowrap">
+                  {% if order.status == 'pending' %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Pending
+                    </span>
+                  {% elif order.status == 'confirmed' %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-teal-500/10 border border-teal-500/30 text-teal-400">
+                      <i class="bi bi-check2"></i> Confirmed
+                    </span>
+                  {% elif order.status == 'shipped' %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                      <i class="bi bi-truck"></i> Shipped
+                    </span>
+                  {% elif order.status == 'delivered' %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                      <i class="bi bi-check-circle-fill"></i> Delivered
+                    </span>
+                  {% elif order.status == 'cancelled' %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                      <i class="bi bi-x-circle"></i> Cancelled
+                    </span>
+                  {% endif %}
+                </td>
+
+                <!-- Actions -->
+                <td class="px-5 py-4 text-right whitespace-nowrap">
+                  <button type="button" onclick="openOrderModal({{ order.id }})"
+                          class="inline-flex items-center gap-1.5 bg-paper hover:bg-violet hover:text-white border border-border px-3 py-1.5 rounded-lg text-xs font-semibold text-text transition-all">
+                    <i class="bi bi-eye"></i> View Details
+                  </button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-12 text-center text-text-muted">
+        <i class="bi bi-inbox text-4xl block mb-2 opacity-50"></i>
+        <p class="font-semibold text-sm">No orders found matching the filter criteria.</p>
+        <p class="text-xs mt-1">Try resetting the filters or searching with a different term.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- LUXURY ORDER DETAIL MODAL                                                     -->
+<!-- ============================================================================== -->
+<div id="orderDetailModal" class="fixed inset-0 z-[99999] hidden overflow-y-auto bg-black/75 backdrop-blur-sm p-4 sm:p-6" style="display: none; align-items: center; justify-content: center;">
+  <div class="relative w-full max-w-3xl my-auto mx-auto bg-card border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+    
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-border bg-paper">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-violet/10 border border-violet/30 flex items-center justify-center text-violet">
+          <i class="bi bi-receipt text-lg"></i>
+        </div>
+        <div>
+          <h3 class="font-mono text-base font-bold text-text flex items-center gap-2">
+            <span id="modalOrderNumber">ORD-XXXX</span>
+            <span id="modalStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full font-sans">Pending</span>
+          </h3>
+          <p class="text-[11px] text-text-muted mt-0.5" id="modalCreatedAt">Created: —</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeOrderModal()" class="text-text-muted hover:text-text p-1.5 rounded-lg border border-transparent hover:border-border transition-colors">
+        <i class="bi bi-x-lg text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+
+      <!-- Customer & Payment Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Customer Info Card -->
+        <div class="bg-paper border border-border rounded-xl p-4 space-y-2">
+          <h4 class="text-xs uppercase tracking-wider font-bold text-violet flex items-center gap-1.5">
+            <i class="bi bi-person"></i> Customer Information
+          </h4>
+          <div class="text-xs space-y-1">
+            <div class="flex justify-between"><span class="text-text-muted">Name:</span> <span class="font-semibold text-text" id="modalCustomerName">—</span></div>
+            <div class="flex justify-between"><span class="text-text-muted">Email:</span> <span class="text-text" id="modalCustomerEmail">—</span></div>
+            <div class="flex justify-between"><span class="text-text-muted">Phone:</span> <span class="text-text font-mono" id="modalCustomerPhone">—</span></div>
+            <div class="pt-1.5 border-t border-border">
+              <span class="text-text-muted block text-[11px] mb-0.5">Delivery Address:</span>
+              <p class="text-text text-[11px] leading-relaxed" id="modalCustomerAddress">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment & Hash Card -->
+        <div class="bg-paper border border-border rounded-xl p-4 space-y-2">
+          <h4 class="text-xs uppercase tracking-wider font-bold text-violet flex items-center gap-1.5">
+            <i class="bi bi-credit-card"></i> Payment & Bakong Hash
+          </h4>
+          <div class="text-xs space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-text-muted">Payment Method:</span>
+              <span class="px-2 py-0.5 rounded text-[11px] font-semibold uppercase bg-card border border-border text-text font-mono" id="modalPaymentMethod">—</span>
+            </div>
+            
+            <!-- Bakong MD5 Hash Box with 1-Click Copy -->
+            <div>
+              <span class="text-text-muted block text-[11px] mb-1">Bakong MD5 Transaction Hash:</span>
+              <div class="flex items-center gap-2 bg-card border border-border rounded-lg p-2 font-mono text-xs">
+                <span id="modalBakongHash" class="text-violet truncate flex-1 font-bold">00000000000000000000000000000000</span>
+                <button type="button" id="copyHashBtn" onclick="copyModalHash()"
+                        class="inline-flex items-center gap-1 bg-violet hover:bg-[#5b4de8] text-white px-2.5 py-1 rounded text-[11px] font-sans font-semibold transition-all shrink-0">
+                  <i class="bi bi-clipboard"></i> <span id="copyHashBtnText">Copy Hash</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Localized Lifecycle Timestamps -->
+            <div class="pt-2 border-t border-border text-[11px] text-text-muted space-y-0.5" id="modalTimestampsList">
+              <div id="modalConfirmedRow" class="flex justify-between hidden"><span>Confirmed:</span> <span class="font-mono text-text" id="modalConfirmedAt">—</span></div>
+              <div id="modalShippedRow" class="flex justify-between hidden"><span>Shipped:</span> <span class="font-mono text-text" id="modalShippedAt">—</span></div>
+              <div id="modalDeliveredRow" class="flex justify-between hidden"><span>Delivered:</span> <span class="font-mono text-text" id="modalDeliveredAt">—</span></div>
+              <div id="modalCancelledRow" class="flex justify-between hidden"><span>Cancelled:</span> <span class="font-mono text-rose-400" id="modalCancelledAt">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Itemized Breakdown Table -->
+      <div>
+        <h4 class="text-xs uppercase tracking-wider font-bold text-text-muted mb-2 flex items-center gap-1.5">
+          <i class="bi bi-list-check"></i> Itemized Line Items
+        </h4>
+        <div class="border border-border rounded-xl overflow-hidden bg-paper">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-card border-b border-border uppercase text-[10px] text-text-muted font-bold">
+              <tr>
+                <th class="px-4 py-2.5">Item & Spec</th>
+                <th class="px-4 py-2.5 font-mono">SKU</th>
+                <th class="px-4 py-2.5 text-center">Qty</th>
+                <th class="px-4 py-2.5 text-right">Unit Price</th>
+                <th class="px-4 py-2.5 text-right">Line Total</th>
+              </tr>
+            </thead>
+            <tbody id="modalItemsBody" class="divide-y divide-border font-mono text-[11px]">
+              <!-- Injected dynamically via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Financial Breakdown -->
+      <div class="bg-paper border border-border rounded-xl p-4 flex flex-col items-end text-xs space-y-1.5">
+        <div class="flex justify-between w-full sm:w-64 text-text-muted">
+          <span>Subtotal:</span>
+          <span class="font-mono text-text" id="modalSubtotal">$0.00</span>
+        </div>
+        <div class="flex justify-between w-full sm:w-64 text-text-muted" id="modalDiscountRow">
+          <span>Discount / Coupon:</span>
+          <span class="font-mono text-emerald-400" id="modalDiscount">-$0.00</span>
+        </div>
+        <div class="flex justify-between w-full sm:w-64 pt-2 border-t border-border font-bold text-sm text-text">
+          <span>Total:</span>
+          <span class="font-mono text-violet text-base" id="modalTotal">$0.00</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer / Transition Actions -->
+    <div class="px-6 py-4 border-t border-border bg-paper flex flex-wrap items-center justify-between gap-3">
+      <div class="text-[11px] text-text-muted" id="modalProgressionHelp">
+        Forward-only lifecycle: <span class="font-mono font-bold text-text">pending ➔ confirmed ➔ shipped ➔ delivered</span>
+      </div>
+
+      <div class="flex items-center gap-2" id="modalActionButtons">
+        <!-- Injected dynamically based on order.status -->
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- JavaScript for Modal & 1-Click Clipboard Copy -->
+<script>
+  let currentModalOrder = null;
+
+  async function openOrderModal(orderId) {
+    const modal = document.getElementById('orderDetailModal');
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+
+    try {
+      const response = await fetch(`/admin/orders/${orderId}?format=json`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.error || 'Failed to load order details');
+        closeOrderModal();
+        return;
+      }
+
+      const o = data.order;
+      currentModalOrder = o;
+
+      document.getElementById('modalOrderNumber').innerText = o.order_number;
+      document.getElementById('modalCreatedAt').innerText = 'Created: ' + (o.created_at || '—');
+      document.getElementById('modalCustomerName').innerText = o.customer_name;
+      document.getElementById('modalCustomerEmail').innerText = o.email;
+      document.getElementById('modalCustomerPhone').innerText = o.phone;
+      document.getElementById('modalCustomerAddress').innerText = o.address;
+      document.getElementById('modalPaymentMethod').innerText = o.payment_method;
+      document.getElementById('modalBakongHash').innerText = o.bakong_hash;
+      document.getElementById('modalSubtotal').innerText = o.subtotal_formatted;
+      document.getElementById('modalDiscount').innerText = '-' + o.discount_formatted;
+      document.getElementById('modalTotal').innerText = o.total_formatted;
+
+      // Status badge style
+      const badge = document.getElementById('modalStatusBadge');
+      badge.innerText = o.status.toUpperCase();
+      badge.className = 'text-xs px-2.5 py-0.5 rounded-full font-sans font-bold uppercase ';
+      if (o.status === 'pending') badge.className += 'bg-amber-500/10 text-amber-400 border border-amber-500/30';
+      else if (o.status === 'confirmed') badge.className += 'bg-teal-500/10 text-teal-400 border border-teal-500/30';
+      else if (o.status === 'shipped') badge.className += 'bg-blue-500/10 text-blue-400 border border-blue-500/30';
+      else if (o.status === 'delivered') badge.className += 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+      else badge.className += 'bg-rose-500/10 text-rose-400 border border-rose-500/30';
+
+      // Timestamps
+      toggleRow('modalConfirmedRow', 'modalConfirmedAt', o.confirmed_at);
+      toggleRow('modalShippedRow', 'modalShippedAt', o.shipped_at);
+      toggleRow('modalDeliveredRow', 'modalDeliveredAt', o.delivered_at);
+      toggleRow('modalCancelledRow', 'modalCancelledAt', o.cancelled_at);
+
+      // Line items table
+      const tbody = document.getElementById('modalItemsBody');
+      tbody.innerHTML = '';
+      o.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-card/40 transition-colors';
+        tr.innerHTML = `
+          <td class="px-4 py-2.5">
+            <div class="font-sans font-semibold text-text">${item.product_name}</div>
+            <div class="text-[10px] text-text-muted">${item.spec_name}</div>
+          </td>
+          <td class="px-4 py-2.5 text-text-muted">${item.sku}</td>
+          <td class="px-4 py-2.5 text-center font-bold text-text">${item.qty}</td>
+          <td class="px-4 py-2.5 text-right text-text-muted">${item.unit_price_formatted}</td>
+          <td class="px-4 py-2.5 text-right font-bold text-text">${item.line_total_formatted}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Actions / Status Progression buttons
+      renderActionButtons(o);
+
+    } catch (err) {
+      console.error(err);
+      alert('Error loading order details');
+      closeOrderModal();
+    }
+  }
+
+  function toggleRow(rowId, textId, value) {
+    const row = document.getElementById(rowId);
+    if (value) {
+      row.classList.remove('hidden');
+      document.getElementById(textId).innerText = value;
+    } else {
+      row.classList.add('hidden');
+    }
+  }
+
+  function renderActionButtons(order) {
+    const container = document.getElementById('modalActionButtons');
+    container.innerHTML = '';
+    const csrfToken = '{{ csrf_token() }}';
+
+    if (order.status === 'pending') {
+      container.innerHTML = `
+        <form action="/admin/orders/${order.id}/status" method="POST" class="inline m-0">
+          <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+          <input type="hidden" name="status" value="confirmed"/>
+          <button type="submit" class="bg-teal hover:bg-teal-600 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+            <i class="bi bi-check-lg"></i> Confirm Order
+          </button>
+        </form>
+        <form action="/admin/orders/${order.id}/status" method="POST" class="inline m-0" onsubmit="return confirm('Are you sure you want to cancel this order? Stock will be restored.');">
+          <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+          <input type="hidden" name="status" value="cancelled"/>
+          <button type="submit" class="bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+            <i class="bi bi-x-circle"></i> Cancel Order
+          </button>
+        </form>
+      `;
+    } else if (order.status === 'confirmed') {
+      container.innerHTML = `
+        <form action="/admin/orders/${order.id}/status" method="POST" class="inline m-0">
+          <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+          <input type="hidden" name="status" value="shipped"/>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+            <i class="bi bi-truck"></i> Mark as Shipped
+          </button>
+        </form>
+        <form action="/admin/orders/${order.id}/status" method="POST" class="inline m-0" onsubmit="return confirm('Cancel confirmed order? Inventory will be restored.');">
+          <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+          <input type="hidden" name="status" value="cancelled"/>
+          <button type="submit" class="bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+            <i class="bi bi-x-circle"></i> Cancel Order
+          </button>
+        </form>
+      `;
+    } else if (order.status === 'shipped') {
+      container.innerHTML = `
+        <form action="/admin/orders/${order.id}/status" method="POST" class="inline m-0">
+          <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+          <input type="hidden" name="status" value="delivered"/>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+            <i class="bi bi-check-circle-fill"></i> Mark as Delivered
+          </button>
+        </form>
+      `;
+    } else {
+      container.innerHTML = `
+        <span class="text-xs font-semibold text-text-muted px-3 py-1.5 rounded-lg bg-card border border-border">
+          <i class="bi bi-lock-fill"></i> Terminal State (${order.status.toUpperCase()})
+        </span>
+      `;
+    }
+
+    container.innerHTML += `
+      <button type="button" onclick="closeOrderModal()" class="bg-card hover:bg-paper border border-border text-text font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors">
+        Close
+      </button>
+    `;
+  }
+
+  function closeOrderModal() {
+    const modal = document.getElementById('orderDetailModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+    currentModalOrder = null;
+  }
+
+  // 1-Click Clipboard Copy Handler
+  function copyModalHash() {
+    if (!currentModalOrder || !currentModalOrder.bakong_hash) return;
+    copyHashText(currentModalOrder.bakong_hash, document.getElementById('copyHashBtn'));
+  }
+
+  function copyHashText(hashText, btnElement) {
+    if (!hashText) return;
+    navigator.clipboard.writeText(hashText).then(() => {
+      const btnText = btnElement.querySelector('#copyHashBtnText') || btnElement;
+      const originalHTML = btnText.innerHTML;
+      btnText.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+      btnElement.classList.add('ring-2', 'ring-emerald-400');
+      setTimeout(() => {
+        btnText.innerHTML = originalHTML;
+        btnElement.classList.remove('ring-2', 'ring-emerald-400');
+      }, 1800);
+    }).catch(err => {
+      console.error('Copy failed: ', err);
+      alert('Could not copy hash: ' + err);
+    });
+  }
+
+  // Close modal when clicking outside
+  document.getElementById('orderDetailModal').addEventListener('click', function(e) {
+    if (e.target === this) closeOrderModal();
+  });
+</script>
+{% endblock %}
+
