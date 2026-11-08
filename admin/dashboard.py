@@ -29,9 +29,9 @@ def dashboard():
     pending_orders = [o for o in all_orders if o.status == 'pending']
     cancelled_orders = [o for o in all_orders if o.status == 'cancelled']
 
-    net_revenue_cents = sum(o.total_cents for o in completed_orders)
-    gross_sales_cents = sum(o.subtotal_cents for o in all_orders if o.status != 'cancelled')
-    total_discounts_cents = sum(o.discount_cents for o in all_orders if o.status != 'cancelled')
+    net_revenue_cents = sum((o.total_cents or 0) for o in completed_orders)
+    gross_sales_cents = sum((o.subtotal_cents or 0) for o in all_orders if o.status != 'cancelled')
+    total_discounts_cents = sum((o.discount_cents or 0) for o in all_orders if o.status != 'cancelled')
 
     refund_rate = round((len(cancelled_orders) / total_orders * 100), 1) if total_orders > 0 else 0.0
     aov_cents = round(net_revenue_cents / len(completed_orders)) if completed_orders else 0
@@ -42,7 +42,7 @@ def dashboard():
     active_products_count = Product.query.filter_by(is_active=True).count()
     variants_count = ProductVariant.query.count()
     active_variants = ProductVariant.query.filter_by(is_active=True).all()
-    total_inventory_units = sum(v.stock for v in active_variants)
+    total_inventory_units = sum((v.stock or 0) for v in active_variants)
     low_stock_variants = get_low_stock_variants()
     low_stock_count = len(low_stock_variants)
     out_of_stock_count = sum(1 for v in low_stock_variants if v.stock <= 0)
@@ -69,8 +69,8 @@ def dashboard():
             'sku': v.sku,
             'stock': v.stock,
             'threshold': thresh,
-            'price_formatted': format_money(v.price_cents),
-            'is_out_of_stock': (v.stock <= 0),
+            'price_formatted': format_money(v.price_cents or 0),
+            'is_out_of_stock': ((v.stock or 0) <= 0),
             'category_name': cat_name,
             'brand_name': brand_name
         })
@@ -89,7 +89,7 @@ def dashboard():
                 orders_by_day[d_key] = {'rev_cents': 0, 'count': 0}
             orders_by_day[d_key]['count'] += 1
             if o.status in ('confirmed', 'shipped', 'delivered'):
-                orders_by_day[d_key]['rev_cents'] += o.total_cents
+                orders_by_day[d_key]['rev_cents'] += (o.total_cents or 0)
 
     max_day_cents = max([v['rev_cents'] for v in orders_by_day.values()] + [1])
 

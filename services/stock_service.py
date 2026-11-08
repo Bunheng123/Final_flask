@@ -662,7 +662,8 @@ def get_low_stock_variants(threshold: Optional[int] = None) -> List[ProductVaria
     low_stock = []
     for v in all_variants:
         thresh = v.low_stock_threshold if v.low_stock_threshold is not None else fallback
-        if v.stock <= thresh:
+        stock_val = v.stock if v.stock is not None else 0
+        if stock_val <= thresh:
             low_stock.append(v)
     return low_stock
 

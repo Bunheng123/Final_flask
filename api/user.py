@@ -1,7 +1,7 @@
 from flask import jsonify, request, session
-from sqlalchemy import text
 from api import api_bp
 from extensions import db
+from models.user import User
 
 def require_admin_session():
     if not session.get('is_login') or session.get('role') != 'admin':
@@ -13,14 +13,26 @@ def require_admin_session():
     return None
 
 def get_all_users():
-    sql = text("SELECT id, username, email, role, profile FROM user")
-    result = db.session.execute(sql)
-    return [dict(row._mapping) for row in result]
+    users = User.query.all()
+    return [{
+        'id': u.id,
+        'username': u.username,
+        'email': u.email,
+        'role': u.role,
+        'profile': u.profile
+    } for u in users]
 
 def get_user_by_id(user_id):
-    sql = text("SELECT id, username, email, role, profile FROM user WHERE id = :user_id")
-    result = db.session.execute(sql, {"user_id": user_id}).fetchone()
-    return dict(result._mapping) if result else None
+    u = db.session.get(User, user_id)
+    if not u:
+        return None
+    return {
+        'id': u.id,
+        'username': u.username,
+        'email': u.email,
+        'role': u.role,
+        'profile': u.profile
+    }
 
 @api_bp.get('/users', endpoint='get_users')
 @api_bp.get('/user', endpoint='get_user_list')
