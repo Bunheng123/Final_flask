@@ -512,6 +512,11 @@
             if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';
             return;
           }
+          if (response.status === 403 || result.status === 'ip_restricted') {
+            if (statusMessage) statusMessage.textContent = result.message || '⚠️ Bakong API restricted: NBC only accepts requests from Cambodia IPs. Admin can confirm your order in the dashboard.';
+            if (statusDot) statusDot.className = 'h-2 w-2 rounded-full bg-amber-400';
+            return;
+          }
           if (response.status === 503) {
             const errorMsg = (result && result.message) ? result.message : 'Payment gateway busy. Please wait a moment and try again.';
             if (statusMessage) statusMessage.textContent = errorMsg;

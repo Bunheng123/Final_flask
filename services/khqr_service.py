@@ -267,7 +267,25 @@ def get_payment_status(reference_md5):
             raw_resp = None
             try:
                 raw_resp = client._KHQR__post_request("/check_transaction_by_md5", {"md5": reference_md5})
-            except Exception:
+            except Exception as req_exc:
+                err_str = str(req_exc).lower()
+                if any(k in err_str for k in ("limit of 100", "too many requests", "429", "quota")):
+                    payment['bakong_status'] = 'QUOTA_EXCEEDED'
+                    payment['gateway_error'] = str(req_exc)
+                    return {
+                        'success': False,
+                        'status': 'quota_exceeded',
+                        'message': 'Daily request limit of 100 exceeded on Bakong Developer API. If you have already paid in your app, your funds are safe! Please contact admin to confirm your order.',
+                        'data': payment
+                    }
+                if any(k in err_str for k in ("cambodia ip", "403", "restricted")):
+                    payment['gateway_error'] = str(req_exc)
+                    return {
+                        'success': False,
+                        'status': 'ip_restricted',
+                        'message': 'Bakong API only accepts requests from Cambodia IP addresses. Your AWS server IP is outside Cambodia. Admin can confirm your order in the dashboard.',
+                        'data': payment
+                    }
                 raw_resp = None
 
             if isinstance(raw_resp, dict):
@@ -299,7 +317,25 @@ def get_payment_status(reference_md5):
                 elif payment['bakong_status'] == 'EXPIRED':
                     payment['status'] = 'expired'
         except Exception as exc:
-            raise RuntimeError('Bakong payment status check failed.') from exc
+            err_str = str(exc).lower()
+            if any(k in err_str for k in ("limit of 100", "too many requests", "429", "quota")):
+                payment['bakong_status'] = 'QUOTA_EXCEEDED'
+                payment['gateway_error'] = str(exc)
+                return {
+                    'success': False,
+                    'status': 'quota_exceeded',
+                    'message': 'Daily request limit of 100 exceeded on Bakong Developer API. If you have already paid in your app, your funds are safe! Please contact admin to confirm your order.',
+                    'data': payment
+                }
+            if any(k in err_str for k in ("cambodia ip", "403", "restricted")):
+                payment['gateway_error'] = str(exc)
+                return {
+                    'success': False,
+                    'status': 'ip_restricted',
+                    'message': 'Bakong API only accepts requests from Cambodia IP addresses. Your AWS server IP is outside Cambodia. Admin can confirm your order in the dashboard.',
+                    'data': payment
+                }
+            raise RuntimeError(f"Bakong payment check failed: {exc}") from exc
 
     return {'success': True, 'data': payment}
 

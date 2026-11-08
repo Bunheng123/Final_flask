@@ -25,10 +25,13 @@ def api_payment_check(payment_hash):
     if not status['success']:
         if status.get('status') == 'quota_exceeded':
             return jsonify(status), 429
+        if status.get('status') == 'ip_restricted':
+            return jsonify(status), 403
         return jsonify({
             'success': False,
-            'status': 'not_found',
-            'message': 'Payment reference not found.'
+            'status': status.get('status') or 'not_found',
+            'message': status.get('message') or 'Payment reference not found.',
+            'data': status.get('data')
         }), 404
 
     payment_state = status['data'].get('status')
